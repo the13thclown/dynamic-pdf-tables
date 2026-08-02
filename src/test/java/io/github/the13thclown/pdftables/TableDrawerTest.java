@@ -639,11 +639,11 @@ class TableDrawerTest {
         Color accent = new Color(180, 60, 45);
 
         Table.Builder b = Table.builder()
-                .addColumnsOfWidth(34, 166, 120, 180)
+                .addColumnsOfWidth(40, 190, 135, 150)
                 .defaultStyle(Style.builder()
                         .borderAll(BorderStyle.of(0.6f, new Color(120, 128, 145)))
-                        .padding(io.github.the13thclown.pdftables.style.Padding.of(6))
-                        .fontSize(9)                              // table-wide text default
+                        .padding(io.github.the13thclown.pdftables.style.Padding.of(7))
+                        .fontSize(10)                             // table-wide text default
                         .build())
                 .headerRowCount(1)
                 .rowStyler(row -> row >= 2 && row % 2 == 0
@@ -656,8 +656,8 @@ class TableDrawerTest {
         // repeating header: logo + bold white title on a dark band
         b.add(Cell.builder().colSpan(4)
                 .backgroundColor(night)
-                .add(ImageContent.builder(sampleImage(120, 30, accent, night)).height(14).build())
-                .add(TextContent.builder("QUARTERLY PRODUCT REPORT").font(bold).fontSize(13)
+                .add(ImageContent.builder(sampleImage(120, 30, accent, night)).height(16).build())
+                .add(TextContent.builder("QUARTERLY PRODUCT REPORT").font(bold).fontSize(16)
                         .color(Color.WHITE).build())
                 .horizontalAlignment(HorizontalAlignment.CENTER)
                 .build());
@@ -691,23 +691,23 @@ class TableDrawerTest {
                             .build());
                 }
                 b.add(Cell.of(RichTextContent.builder()
-                        .add(RichTextContent.fragment("Product " + product + "\n").font(bold).fontSize(10))
+                        .add(RichTextContent.fragment("Product " + product + "\n").font(bold).fontSize(12))
                         .add(RichTextContent.fragment("A short description that wraps over a couple "
-                                + "of lines and inherits the table-wide 9pt default.")
+                                + "of lines and inherits the table-wide 10pt default.")
                                 .color(new Color(90, 90, 90)))
                         .build()));
                 b.add(Cell.builder()
                         .add(ImageContent.builder(sampleImage(90, 54,
                                 new Color(40 + product * 12, 90, 190 - product * 9),
-                                new Color(235, 240, 248))).width(88).build())
+                                new Color(235, 240, 248))).width(112).build())
                         .horizontalAlignment(HorizontalAlignment.CENTER)
                         .build());
                 Table stats = Table.builder()
                         .addColumnOfRelativeWidth(2).addColumnOfRelativeWidth(1)
                         .defaultStyle(Style.builder()
                                 .borderAll(BorderStyle.of(0.4f, new Color(170, 175, 190)))
-                                .padding(io.github.the13thclown.pdftables.style.Padding.of(3))
-                                .fontSize(8).build())
+                                .padding(io.github.the13thclown.pdftables.style.Padding.of(4))
+                                .fontSize(9).build())
                         .add(Cell.of(TextContent.of("Units")))
                         .add(Cell.builder().add(TextContent.of(String.valueOf(120 + product * 37)))
                                 .horizontalAlignment(HorizontalAlignment.RIGHT).build())
@@ -729,12 +729,13 @@ class TableDrawerTest {
                 .backgroundColor(new Color(230, 233, 240))
                 .add(RichTextContent.builder()
                         .add("Grand total: ")
-                        .add(RichTextContent.fragment("187.4k EUR").font(bold).fontSize(12))
+                        .add(RichTextContent.fragment("187.4k EUR").font(bold).fontSize(14))
                         .build())
                 .build());
 
         try (PDDocument doc = new PDDocument()) {
-            TableDrawer.builder().document(doc).table(b.build()).build().draw();
+            TableDrawer.builder().document(doc).table(b.build())
+                    .startX(40).build().draw();
             assertThat(doc.getNumberOfPages()).isGreaterThanOrEqualTo(2);
             save(doc, "showcase.pdf");
         }
