@@ -82,10 +82,13 @@ public final class LayoutEngine {
      * Builds layout cells from grid placements: resolves each cell's style
      * along the cascade cell → row styler → column styler → table default →
      * {@code base}, computes its x/width from the columns, and lays out its
-     * contents into elements at the content width. The only place
-     * {@link io.github.the13thclown.pdftables.CellContent#layout} is ever
-     * called. {@code base} is normally {@link Style#defaults()}; nested tables
-     * pass their outer cell's text defaults so fonts inherit inward.
+     * contents into elements at the content width. This is where
+     * {@link io.github.the13thclown.pdftables.CellContent#layout} is called for
+     * everything that occupies height; the one exception is per-slice overlay
+     * content ({@code Cell.Builder.onEachPageSlice}), which the renderer lays
+     * out per rendered window because slice count only exists after the cut.
+     * {@code base} is normally {@link Style#defaults()}; nested tables pass
+     * their outer cell's text defaults so fonts inherit inward.
      */
     public static List<LayoutCell> buildCells(Table table, List<GridFlow.Placement> placements,
                                               float[] colWidths, Style base) {

@@ -59,6 +59,24 @@ class ImageContentTest {
     }
 
     @Test
+    void embeddedXObjectContentRefusesASecondDocument() throws IOException {
+        try (org.apache.pdfbox.pdmodel.PDDocument first = new org.apache.pdfbox.pdmodel.PDDocument();
+             org.apache.pdfbox.pdmodel.PDDocument second = new org.apache.pdfbox.pdmodel.PDDocument()) {
+            org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject embedded =
+                    org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory
+                            .createFromImage(first, image(20, 20));
+            ImageContent content = ImageContent.of(embedded);
+            Table table = Table.builder().addColumnOfWidth(100).add(Cell.of(content)).build();
+
+            TableDrawer.builder().document(first).table(table).build().draw();
+            TableDrawer secondDrawer = TableDrawer.builder().document(second).table(table).build();
+            assertThatThrownBy(secondDrawer::draw)
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("bound to the document");
+        }
+    }
+
+    @Test
     void unreadableBytesFailAtDefinitionTime() {
         assertThatThrownBy(() -> ImageContent.of(new byte[]{1, 2, 3}, "junk.bin"))
                 .isInstanceOf(IllegalArgumentException.class)

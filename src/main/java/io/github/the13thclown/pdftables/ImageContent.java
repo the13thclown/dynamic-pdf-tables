@@ -44,6 +44,7 @@ public final class ImageContent implements CellContent {
     private final Float width;
     private final Float height;
     private final Map<PDDocument, PDImageXObject> xObjects = new WeakHashMap<>();
+    private PDDocument embeddedDrawnInto;
 
     private ImageContent(Builder b) {
         this.bytes = b.bytes;
@@ -72,7 +73,10 @@ public final class ImageContent implements CellContent {
      * An image already embedded in the target document. Unlike the other
      * sources this one is document-bound, so it must belong to the document
      * being drawn — in exchange the bytes are never re-encoded or embedded a
-     * second time.
+     * second time. Drawing such a content into more than one document is an
+     * error (detected on the second document); the origin document itself
+     * cannot be verified, so passing an XObject from the wrong document is
+     * still the caller's responsibility.
      */
     public static ImageContent of(PDImageXObject embedded) {
         return builder(embedded).build();
@@ -121,6 +125,17 @@ public final class ImageContent implements CellContent {
 
     private synchronized PDImageXObject xObject(PDDocument document) throws IOException {
         if (embedded != null) {
+            // the XObject's origin document isn't observable, but drawing the
+            // same content into two documents is — the second would get a
+            // dangling reference instead of an image, so fail loud
+            if (embeddedDrawnInto == null) {
+                embeddedDrawnInto = document;
+            } else if (embeddedDrawnInto != document) {
+                throw new IllegalStateException(
+                        "ImageContent.of(PDImageXObject) is bound to the document it was first drawn into "
+                                + "and cannot be reused in another document; re-embed the image there instead "
+                                + "(e.g. ImageContent.of(bytes) or PDImageXObject.createFromByteArray)");
+            }
             return embedded;
         }
         PDImageXObject cached = xObjects.get(document);

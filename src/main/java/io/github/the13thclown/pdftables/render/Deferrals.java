@@ -47,7 +47,7 @@ public final class Deferrals {
     public void runAll(PDDocument document) throws IOException {
         for (int round = 0; !entries.isEmpty(); round++) {
             if (round == MAX_ROUNDS) {
-                throw new IOException("Deferred draws still registering new deferred draws after "
+                throw new IllegalStateException("Deferred draws still registering new deferred draws after "
                         + MAX_ROUNDS + " rounds");
             }
             List<Entry> pending = List.copyOf(entries);
