@@ -369,6 +369,46 @@ class TableDrawerTest {
     }
 
     @Test
+    void textTableRendersAndSplitsLineByLineAcrossPages() throws IOException {
+        Table.Builder b = Table.builder()
+                .addColumnsOfWidth(90, 220, 190)
+                .defaultStyle(Style.builder().borderAll(BorderStyle.of(0.7f))
+                        .padding(io.github.orestkollcaku.pdftables.style.Padding.of(6)).build())
+                .headerRowCount(1)
+                .rowStyler(row -> row > 0 && row % 2 == 0
+                        ? Style.builder().backgroundColor(new Color(242, 244, 250)).build()
+                        : null)
+                .add(headerCell("#"))
+                .add(headerCell("Item"))
+                .add(headerCell("Description"));
+        String longText = "A reasonably long description that has to wrap over several lines "
+                + "inside its cell, demonstrating that text flows, wraps at the content width "
+                + "and participates in pagination one line at a time.";
+        for (int i = 1; i <= 25; i++) {
+            b.add(Cell.builder().add(TextContent.of(String.valueOf(i)))
+                    .horizontalAlignment(HorizontalAlignment.RIGHT).build());
+            b.add(Cell.of(TextContent.of("Item number " + i)));
+            b.add(Cell.of(TextContent.builder(i % 5 == 0 ? longText : "Short note.")
+                    .fontSize(9).color(new Color(60, 60, 60)).build()));
+        }
+        try (PDDocument doc = new PDDocument()) {
+            TableDrawer.builder().document(doc).table(b.build()).build().draw();
+            assertThat(doc.getNumberOfPages()).isGreaterThanOrEqualTo(2);
+            save(doc, "text-table.pdf");
+        }
+    }
+
+    private static Cell headerCell(String label) {
+        return Cell.builder()
+                .add(TextContent.builder(label).fontSize(11).color(Color.WHITE)
+                        .font(new org.apache.pdfbox.pdmodel.font.PDType1Font(
+                                org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA_BOLD))
+                        .build())
+                .backgroundColor(new Color(52, 74, 120))
+                .build();
+    }
+
+    @Test
     void elementTallerThanAPageThrows() throws IOException {
         Table table = Table.builder()
                 .addColumnOfWidth(200)

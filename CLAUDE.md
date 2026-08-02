@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-`dynamic-pdf-tables` — a Java 17 / Maven library on top of Apache PDFBox 3.x for dynamic PDF table building. v1 renders placeholder rectangles instead of real content (text/images come later as new `CellContent` implementations).
+`dynamic-pdf-tables` — a Java 17 / Maven library on top of Apache PDFBox 3.x for dynamic PDF table building. Content types: `TextContent` (one element per wrapped line — pagination splits text line by line for free), `TableContent` (nested tables), `PlaceholderContent` (layout prototyping). New types plug in via `CellContent` without engine changes; text styling (font/size/color/spacing) lives on `TextContent`, not `Style` — `Style` is cell-box styling only.
 
 ## Commands
 
