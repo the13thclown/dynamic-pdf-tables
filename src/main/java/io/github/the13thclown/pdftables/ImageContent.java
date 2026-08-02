@@ -38,6 +38,7 @@ public final class ImageContent implements CellContent {
     private final byte[] bytes;
     private final String name;
     private final BufferedImage image;
+    private final PDImageXObject embedded;
     private final int pixelWidth;
     private final int pixelHeight;
     private final Float width;
@@ -48,6 +49,7 @@ public final class ImageContent implements CellContent {
         this.bytes = b.bytes;
         this.name = b.name;
         this.image = b.image;
+        this.embedded = b.embedded;
         this.pixelWidth = b.pixelWidth;
         this.pixelHeight = b.pixelHeight;
         this.width = b.width;
@@ -66,6 +68,16 @@ public final class ImageContent implements CellContent {
         return builder(image).build();
     }
 
+    /**
+     * An image already embedded in the target document. Unlike the other
+     * sources this one is document-bound, so it must belong to the document
+     * being drawn — in exchange the bytes are never re-encoded or embedded a
+     * second time.
+     */
+    public static ImageContent of(PDImageXObject embedded) {
+        return builder(embedded).build();
+    }
+
     public static Builder builder(Path path) {
         try {
             return builder(Files.readAllBytes(path), path.getFileName().toString());
@@ -75,11 +87,15 @@ public final class ImageContent implements CellContent {
     }
 
     public static Builder builder(byte[] bytes, String name) {
-        return new Builder(bytes.clone(), name, null);
+        return new Builder(bytes.clone(), name, null, null);
     }
 
     public static Builder builder(BufferedImage image) {
-        return new Builder(null, "image", image);
+        return new Builder(null, "image", image, null);
+    }
+
+    public static Builder builder(PDImageXObject embedded) {
+        return new Builder(null, "image", null, Objects.requireNonNull(embedded, "embedded"));
     }
 
     @Override
@@ -104,6 +120,9 @@ public final class ImageContent implements CellContent {
     }
 
     private synchronized PDImageXObject xObject(PDDocument document) throws IOException {
+        if (embedded != null) {
+            return embedded;
+        }
         PDImageXObject cached = xObjects.get(document);
         if (cached == null) {
             cached = image != null
@@ -174,16 +193,21 @@ public final class ImageContent implements CellContent {
         private final byte[] bytes;
         private final String name;
         private final BufferedImage image;
+        private final PDImageXObject embedded;
         private final int pixelWidth;
         private final int pixelHeight;
         private Float width;
         private Float height;
 
-        private Builder(byte[] bytes, String name, BufferedImage image) {
+        private Builder(byte[] bytes, String name, BufferedImage image, PDImageXObject embedded) {
             this.bytes = bytes;
             this.name = Objects.requireNonNull(name, "name");
             this.image = image;
-            if (image != null) {
+            this.embedded = embedded;
+            if (embedded != null) {
+                this.pixelWidth = embedded.getWidth();
+                this.pixelHeight = embedded.getHeight();
+            } else if (image != null) {
                 this.pixelWidth = image.getWidth();
                 this.pixelHeight = image.getHeight();
             } else {

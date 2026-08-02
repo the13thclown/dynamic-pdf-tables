@@ -5,7 +5,9 @@ import io.github.the13thclown.pdftables.layout.LayoutCell;
 import io.github.the13thclown.pdftables.layout.LayoutEngine;
 import io.github.the13thclown.pdftables.layout.PageCutter;
 import io.github.the13thclown.pdftables.layout.VirtualLayout;
+import io.github.the13thclown.pdftables.render.Deferrals;
 import io.github.the13thclown.pdftables.render.LayoutRenderer;
+import io.github.the13thclown.pdftables.render.PageRef;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -62,9 +64,18 @@ public final class TableDrawer {
 
     /**
      * Draws the table and returns the y coordinate of its bottom edge on the
-     * last page it touched.
+     * last page it touched. Any {@link io.github.the13thclown.pdftables.render.DeferredDraw}
+     * an element registered runs once the last page is drawn, so callbacks see
+     * the finished pagination.
      */
     public float draw() throws IOException {
+        Deferrals deferrals = new Deferrals();
+        float bottom = drawPages(deferrals);
+        deferrals.runAll(document);
+        return bottom;
+    }
+
+    private float drawPages(Deferrals deferrals) throws IOException {
         GridFlow.Result grid = GridFlow.flow(table);
 
         PDPage page = startPage != null ? startPage : pageSupplier.get();
@@ -124,12 +135,15 @@ public final class TableDrawer {
 
             PageCutter.CutResult cut = PageCutter.cut(current, capacity);
             float bodyTop = pageTop - (headerToDraw != null ? headerToDraw.totalHeight() : 0);
+            PageRef pageRef = deferrals.pageRef(page, document.getPages().indexOf(page));
             try (PDPageContentStream cs = new PDPageContentStream(
                     document, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
                 if (headerToDraw != null) {
-                    LayoutRenderer.render(document, cs, headerToDraw, 0, headerToDraw.totalHeight(), originX, pageTop);
+                    LayoutRenderer.render(document, cs, pageRef, headerToDraw,
+                            0, headerToDraw.totalHeight(), originX, pageTop);
                 }
-                LayoutRenderer.render(document, cs, cut.pageLayout(), 0, cut.cutY(), originX, bodyTop, closeBordersAtPageBreak);
+                LayoutRenderer.render(document, cs, pageRef, cut.pageLayout(),
+                        0, cut.cutY(), originX, bodyTop, closeBordersAtPageBreak);
             }
             if (cut.finished()) {
                 return bodyTop - cut.cutY();

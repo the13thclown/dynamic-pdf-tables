@@ -128,17 +128,17 @@ public final class LayoutEngine {
                     // a positioned content's elements stack from its anchor point
                     float y = entry.y();
                     for (Element e : elements) {
-                        items.add(new LayoutCell.Item(e, entry.x(), y));
+                        items.add(new LayoutCell.Item(e, entry.x(), y, false));
                         y += e.getHeight();
                     }
                 } else {
                     for (Element e : elements) {
-                        items.add(new LayoutCell.Item(e, null, null));
+                        items.add(new LayoutCell.Item(e, null, null, entry.bottom()));
                     }
                 }
             }
             cells.add(new LayoutCell(p.row(), p.col(), cell.rowSpan(), cell.colSpan(),
-                    style, items, false, colX[p.col()], width));
+                    style, items, false, colX[p.col()], width, cell.pageSliceContent()));
         }
         return cells;
     }

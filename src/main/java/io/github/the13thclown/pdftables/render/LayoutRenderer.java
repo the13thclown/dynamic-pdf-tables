@@ -37,18 +37,18 @@ public final class LayoutRenderer {
     private LayoutRenderer() {
     }
 
-    public static void render(PDDocument document, PDPageContentStream cs, VirtualLayout layout,
+    public static void render(PDDocument document, PDPageContentStream cs, PageRef pageRef, VirtualLayout layout,
                               float fromY, float toY, float originX, float topY) throws IOException {
-        render(document, cs, layout, fromY, toY, originX, topY, false);
+        render(document, cs, pageRef, layout, fromY, toY, originX, topY, false);
     }
 
     /**
-     * As {@link #render(PDDocument, PDPageContentStream, VirtualLayout, float, float, float, float)},
+     * As {@link #render(PDDocument, PDPageContentStream, PageRef, VirtualLayout, float, float, float, float)},
      * but with {@code closeCutBorders} a cell cut by the window's bottom edge
      * draws its bottom border along the cut line, and a continued cell draws
      * its top border — cut boxes look closed on every page instead of open.
      */
-    public static void render(PDDocument document, PDPageContentStream cs, VirtualLayout layout,
+    public static void render(PDDocument document, PDPageContentStream cs, PageRef pageRef, VirtualLayout layout,
                               float fromY, float toY, float originX, float topY,
                               boolean closeCutBorders) throws IOException {
         for (LayoutCell c : layout.cells()) {
@@ -83,11 +83,14 @@ public final class LayoutRenderer {
                     // positioned items sit exactly at their offset; cell alignment
                     // must not re-position them within the leftover width
                     e.draw(new RenderContext(document, cs, contentX + item.x(), topY - bottom,
-                            Math.max(0, contentWidth - item.x()), e.getHeight(), LEFT_ALIGNED.mergedOnto(s)));
+                            Math.max(0, contentWidth - item.x()), e.getHeight(), LEFT_ALIGNED.mergedOnto(s),
+                            pageRef));
                 } else {
-                    e.draw(new RenderContext(document, cs, contentX, topY - bottom, contentWidth, e.getHeight(), s));
+                    e.draw(new RenderContext(document, cs, contentX, topY - bottom, contentWidth, e.getHeight(),
+                            s, pageRef));
                 }
             }
+            drawPageSliceContent(document, cs, pageRef, c, fromY, toY, originX, topY);
         }
         // collect all border segments, then stroke thinnest-first: at shared
         // edges (adjacent cells double-draw) the thicker border ends up on top
@@ -121,6 +124,36 @@ public final class LayoutRenderer {
 
     private static boolean visible(LayoutCell c, float fromY, float toY) {
         return c.virtualTop() < toY - EPS && c.virtualTop() + c.height() > fromY + EPS;
+    }
+
+    /**
+     * Draws the cell's per-slice content stacked upwards from the bottom of the
+     * part of the cell visible in this window. It is an overlay — the number of
+     * slices is a pagination outcome and cannot feed back into heights that
+     * were fixed before the cut.
+     */
+    private static void drawPageSliceContent(PDDocument document, PDPageContentStream cs, PageRef pageRef,
+                                             LayoutCell c, float fromY, float toY,
+                                             float originX, float topY) throws IOException {
+        if (c.pageSliceContent() == null) {
+            return;
+        }
+        Style s = c.style();
+        float contentX = originX + c.x() + s.padding().left();
+        float contentWidth = Math.max(0, c.width() - s.padding().horizontal());
+        float sliceBottom = Math.min(c.virtualTop() + c.height(), toY) - s.padding().bottom();
+
+        List<Element> elements = c.pageSliceContent().layout(contentWidth, s);
+        float total = 0;
+        for (Element e : elements) {
+            total += e.getHeight();
+        }
+        float y = sliceBottom - total;
+        for (Element e : elements) {
+            e.draw(new RenderContext(document, cs, contentX, topY - (y + e.getHeight()),
+                    contentWidth, e.getHeight(), s, pageRef));
+            y += e.getHeight();
+        }
     }
 
     private static void line(PDPageContentStream cs, BorderStyle border,

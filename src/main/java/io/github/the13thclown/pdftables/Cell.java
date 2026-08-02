@@ -22,9 +22,10 @@ public final class Cell {
     /**
      * A content and its placement inside the cell's content box: {@code x}/{@code y}
      * are offsets from the box's top-left corner, or both null for normal flow
-     * (contents stack vertically).
+     * (contents stack vertically). Flowing contents anchor to the top of the box
+     * unless {@code bottom} is set, in which case they stack against its bottom.
      */
-    public record ContentEntry(CellContent content, Float x, Float y) {
+    public record ContentEntry(CellContent content, Float x, Float y, boolean bottom) {
 
         public boolean positioned() {
             return x != null;
@@ -35,11 +36,13 @@ public final class Cell {
     private final int colSpan;
     private final int rowSpan;
     private final Style style;
+    private final CellContent pageSliceContent;
 
     private Cell(Builder b) {
         this.contents = List.copyOf(b.contents);
         this.colSpan = b.colSpan;
         this.rowSpan = b.rowSpan;
+        this.pageSliceContent = b.pageSliceContent;
         Style shortcuts = b.styleShortcuts == null ? null : b.styleShortcuts.build();
         if (shortcuts != null && b.style != null) {
             this.style = shortcuts.mergedOnto(b.style);
@@ -76,16 +79,37 @@ public final class Cell {
         return style;
     }
 
+    /** Content repeated at the bottom of every page slice of this cell, or null. */
+    public CellContent pageSliceContent() {
+        return pageSliceContent;
+    }
+
     public static final class Builder {
         private final List<ContentEntry> contents = new ArrayList<>();
         private int colSpan = 1;
         private int rowSpan = 1;
         private Style style;
         private Style.Builder styleShortcuts;
+        private CellContent pageSliceContent;
 
         /** Adds a flowing content; flowing contents stack vertically inside the cell. */
         public Builder add(CellContent content) {
-            contents.add(new ContentEntry(Objects.requireNonNull(content, "content"), null, null));
+            contents.add(new ContentEntry(Objects.requireNonNull(content, "content"), null, null, false));
+            return this;
+        }
+
+        /**
+         * Adds a content anchored to the <em>bottom</em> of the cell's content
+         * box; several stack upwards in the order added. Contents added with
+         * {@link #add} keep flowing from the top, so one cell can hold a label
+         * at the top and a sign-off at the bottom — which vertical alignment
+         * cannot express, since it moves the whole stack as one.
+         * <p>
+         * In a cell tall enough to be cut across pages, bottom-anchored content
+         * therefore lands on the cell's <em>last</em> page.
+         */
+        public Builder addBottom(CellContent content) {
+            contents.add(new ContentEntry(Objects.requireNonNull(content, "content"), null, null, true));
             return this;
         }
 
@@ -102,7 +126,7 @@ public final class Cell {
             if (x < 0 || y < 0) {
                 throw new IllegalArgumentException("Position offsets must be >= 0");
             }
-            contents.add(new ContentEntry(Objects.requireNonNull(content, "content"), x, y));
+            contents.add(new ContentEntry(Objects.requireNonNull(content, "content"), x, y, false));
             return this;
         }
 
@@ -163,6 +187,22 @@ public final class Cell {
                 styleShortcuts = Style.builder();
             }
             return styleShortcuts;
+        }
+
+        /**
+         * Content drawn at the bottom of <em>every</em> page slice this cell is
+         * cut into — a "continued on the next page" marker, or a pointer to
+         * something that ended up on another page. A cell that fits one page
+         * gets it once.
+         * <p>
+         * How many slices a cell has is only known once pages are cut, long
+         * after heights are fixed, so this content is an overlay: it is drawn
+         * inside the bottom of each slice without reserving room. Leave bottom
+         * padding for it, or accept that it sits over the tail of the flow.
+         */
+        public Builder onEachPageSlice(CellContent content) {
+            this.pageSliceContent = Objects.requireNonNull(content, "content");
+            return this;
         }
 
         public Cell build() {

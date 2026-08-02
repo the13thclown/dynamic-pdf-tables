@@ -1,5 +1,6 @@
 package io.github.the13thclown.pdftables.layout;
 
+import io.github.the13thclown.pdftables.CellContent;
 import io.github.the13thclown.pdftables.Element;
 import io.github.the13thclown.pdftables.style.Style;
 import io.github.the13thclown.pdftables.style.VerticalAlignment;
@@ -26,10 +27,15 @@ public final class LayoutCell {
     static final float EPS = 0.01f;
 
     /** An element plus its placement: {@code x}/{@code y} offsets, or both null for flow. */
-    public record Item(Element element, Float x, Float y) {
+    public record Item(Element element, Float x, Float y, boolean bottom) {
 
         public boolean positioned() {
             return x != null;
+        }
+
+        /** Flows from the top of the content box: neither positioned nor bottom-anchored. */
+        public boolean flowsFromTop() {
+            return x == null && !bottom;
         }
     }
 
@@ -42,13 +48,15 @@ public final class LayoutCell {
     private final boolean continuedTop;
     private final float x;
     private final float width;
+    private final CellContent pageSliceContent;
 
     private float virtualTop;
     private float height;
     private float[] elementTops;
 
     public LayoutCell(int row, int col, int rowSpan, int colSpan, Style style,
-                      List<Item> items, boolean continuedTop, float x, float width) {
+                      List<Item> items, boolean continuedTop, float x, float width,
+                      CellContent pageSliceContent) {
         this.row = row;
         this.col = col;
         this.rowSpan = rowSpan;
@@ -58,11 +66,12 @@ public final class LayoutCell {
         this.continuedTop = continuedTop;
         this.x = x;
         this.width = width;
+        this.pageSliceContent = pageSliceContent;
     }
 
     /** Fresh copy with untouched positional state (same grid position and items). */
     public LayoutCell copy() {
-        return new LayoutCell(row, col, rowSpan, colSpan, style, items, continuedTop, x, width);
+        return new LayoutCell(row, col, rowSpan, colSpan, style, items, continuedTop, x, width, pageSliceContent);
     }
 
     /**
@@ -83,8 +92,8 @@ public final class LayoutCell {
     public LayoutCell withItemReplaced(int index, Element replacement, float newTop) {
         List<Item> newItems = new ArrayList<>(items);
         Item original = newItems.get(index);
-        newItems.set(index, new Item(replacement, original.x(), original.y()));
-        LayoutCell copy = new LayoutCell(row, col, rowSpan, colSpan, style, newItems, continuedTop, x, width);
+        newItems.set(index, new Item(replacement, original.x(), original.y(), original.bottom()));
+        LayoutCell copy = new LayoutCell(row, col, rowSpan, colSpan, style, newItems, continuedTop, x, width, pageSliceContent);
         copy.virtualTop = virtualTop;
         copy.height = height;
         copy.elementTops = elementTops.clone();
@@ -123,8 +132,8 @@ public final class LayoutCell {
                 Item kept;
                 if (split != null) {
                     kept = item.positioned()
-                            ? new Item(split.bottom(), item.x(), item.y() + split.top().getHeight())
-                            : new Item(split.bottom(), null, null);
+                            ? new Item(split.bottom(), item.x(), item.y() + split.top().getHeight(), item.bottom())
+                            : new Item(split.bottom(), null, null, item.bottom());
                 } else {
                     kept = item;
                 }
@@ -138,7 +147,7 @@ public final class LayoutCell {
         List<Item> remaining = new ArrayList<>(keep.size());
         for (Item item : keep) {
             if (item.positioned()) {
-                remaining.add(new Item(item.element(), item.x(), item.y() - uniformShift));
+                remaining.add(new Item(item.element(), item.x(), item.y() - uniformShift, item.bottom()));
             } else {
                 remaining.add(item);
             }
@@ -146,18 +155,29 @@ public final class LayoutCell {
         int newRow = Math.max(0, row - firstRemRow);
         int newRowSpan = row + rowSpan - Math.max(row, firstRemRow);
         boolean continued = virtualTop < cutY - EPS;
-        return new LayoutCell(newRow, col, newRowSpan, colSpan, style, remaining, continued, x, width);
+        return new LayoutCell(newRow, col, newRowSpan, colSpan, style, remaining, continued, x, width, pageSliceContent);
     }
 
-    /** Height this cell needs: flow stack or deepest positioned item, plus vertical padding. */
+    /** Height this cell needs: both flow stacks or the deepest positioned item, plus vertical padding. */
     float requiredHeight() {
-        return Math.max(flowStackHeight(), positionedBottom()) + style.padding().vertical();
+        return Math.max(topStackHeight() + bottomStackHeight(), positionedBottom())
+                + style.padding().vertical();
     }
 
-    private float flowStackHeight() {
+    private float topStackHeight() {
         float sum = 0;
         for (Item item : items) {
-            if (!item.positioned()) {
+            if (item.flowsFromTop()) {
+                sum += item.element().getHeight();
+            }
+        }
+        return sum;
+    }
+
+    private float bottomStackHeight() {
+        float sum = 0;
+        for (Item item : items) {
+            if (!item.positioned() && item.bottom()) {
                 sum += item.element().getHeight();
             }
         }
@@ -185,7 +205,9 @@ public final class LayoutCell {
 
         float contentTop = virtualTop + style.padding().top();
         float contentHeight = height - style.padding().vertical();
-        float free = Math.max(0, contentHeight - flowStackHeight());
+        float bottomStack = bottomStackHeight();
+        // vertical alignment distributes only what the two stacks leave over
+        float free = Math.max(0, contentHeight - topStackHeight() - bottomStack);
         float offset;
         if (continuedTop || style.verticalAlignment() == VerticalAlignment.TOP) {
             offset = 0;
@@ -196,10 +218,14 @@ public final class LayoutCell {
         }
         elementTops = new float[items.size()];
         float flowY = contentTop + offset;
+        float bottomY = contentTop + Math.max(contentHeight - bottomStack, topStackHeight() + offset);
         for (int i = 0; i < items.size(); i++) {
             Item item = items.get(i);
             if (item.positioned()) {
                 elementTops[i] = contentTop + item.y();
+            } else if (item.bottom()) {
+                elementTops[i] = bottomY;
+                bottomY += item.element().getHeight();
             } else {
                 elementTops[i] = flowY;
                 flowY += item.element().getHeight();
@@ -243,6 +269,11 @@ public final class LayoutCell {
 
     public float x() {
         return x;
+    }
+
+    /** Content repeated at the bottom of every page slice of this cell, or null. */
+    public CellContent pageSliceContent() {
+        return pageSliceContent;
     }
 
     public float width() {
