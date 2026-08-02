@@ -79,17 +79,64 @@ public final class TableContent implements CellContent {
     }
 
     /**
-     * One atomic slice of the inner layout: the window
-     * {@code [blockTop, blockTop + blockHeight)}. Cells never cross block
-     * boundaries (blocks close all rowspans), so every block draws with
-     * complete borders.
+     * One slice of the inner layout: the window
+     * {@code [blockTop, blockTop + blockHeight)}. Initially blocks close all
+     * rowspans, so cells never cross block boundaries and every block draws
+     * with complete borders. A page cut landing inside a block splits it iff
+     * every inner element the sub-cut crosses agrees to split — then the
+     * pieces are narrower windows with the crossing elements replaced by
+     * their split halves, and inner cell boxes draw cut open at the window
+     * edge exactly like outer cells do.
      */
     private record RowBlockElement(VirtualLayout inner, float blockTop, float blockHeight)
             implements Element {
 
+        private static final float EPS = 0.01f;
+
         @Override
         public float getHeight() {
             return blockHeight;
+        }
+
+        @Override
+        public Split splitAt(float availableHeight) {
+            if (availableHeight <= 1 || blockHeight - availableHeight <= 1) {
+                return null;
+            }
+            float cut = blockTop + availableHeight;
+            List<LayoutCell> topCells = new ArrayList<>(inner.cells().size());
+            List<LayoutCell> bottomCells = new ArrayList<>(inner.cells().size());
+            for (LayoutCell c : inner.cells()) {
+                LayoutCell topCell = c;
+                LayoutCell bottomCell = c;
+                for (int i = 0; i < c.items().size(); i++) {
+                    Element e = c.items().get(i).element();
+                    float top = c.elementTop(i);
+                    float bottom = top + e.getHeight();
+                    if (top < cut - EPS && bottom > cut + EPS) {
+                        // the sub-cut lands inside this inner element: the block
+                        // can only split if the element itself can
+                        Split s = e.splitAt(cut - top);
+                        if (s == null || s.top() == null || s.bottom() == null
+                                || s.top().getHeight() > cut - top + EPS
+                                || s.top().getHeight() <= EPS
+                                || s.bottom().getHeight() <= EPS) {
+                            return null;
+                        }
+                        topCell = topCell.withItemReplaced(i, s.top());
+                        bottomCell = bottomCell.withItemReplaced(i, s.bottom(), cut);
+                    }
+                }
+                topCells.add(topCell);
+                bottomCells.add(bottomCell);
+            }
+            VirtualLayout topLayout = new VirtualLayout(topCells,
+                    inner.rowTops(), inner.rowHeights(), inner.totalHeight());
+            VirtualLayout bottomLayout = new VirtualLayout(bottomCells,
+                    inner.rowTops(), inner.rowHeights(), inner.totalHeight());
+            return new Split(
+                    new RowBlockElement(topLayout, blockTop, availableHeight),
+                    new RowBlockElement(bottomLayout, cut, blockHeight - availableHeight));
         }
 
         @Override

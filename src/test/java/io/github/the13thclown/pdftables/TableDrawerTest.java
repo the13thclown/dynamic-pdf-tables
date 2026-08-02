@@ -602,6 +602,35 @@ class TableDrawerTest {
     }
 
     @Test
+    void nestedTableWithGiantInnerElementSplitsThroughBothLevels() throws IOException {
+        // the inner table's single row block is ~1560pt tall: the outer cut
+        // splits the block, the block asks its crossing inner elements to
+        // split, and both the tall image and the tall placeholder flow across
+        // three pages inside the nested cell
+        Table inner = Table.builder()
+                .addColumnOfRelativeWidth(1).addColumnOfRelativeWidth(1)
+                .defaultStyle(Style.builder().borderAll(BorderStyle.of(0.5f))
+                        .padding(io.github.the13thclown.pdftables.style.Padding.of(4)).build())
+                .add(Cell.builder()
+                        .add(ImageContent.builder(sampleImage(150, 1500,
+                                new Color(30, 90, 60), new Color(220, 240, 200))).width(150).build())
+                        .build())
+                .add(Cell.of(PlaceholderContent.ofHeight(1550)))
+                .build();
+        Table outer = Table.builder()
+                .addColumnsOfWidth(360, 120)
+                .defaultStyle(bordered())
+                .add(Cell.builder().add(TableContent.of(inner)).paddingAll(8).build())
+                .add(Cell.of(TextContent.of("Beside a nested table far taller than a page.")))
+                .build();
+        try (PDDocument doc = new PDDocument()) {
+            TableDrawer.builder().document(doc).table(outer).build().draw();
+            assertThat(doc.getNumberOfPages()).isEqualTo(3);
+            save(doc, "nested-giant-split.pdf");
+        }
+    }
+
+    @Test
     void unsplittableElementTallerThanAPageStillThrows() throws IOException {
         CellContent atomic = (availableWidth, style) -> java.util.List.of(
                 new io.github.the13thclown.pdftables.Element() {

@@ -72,6 +72,15 @@ public final class LayoutCell {
      * shorter, its bottom simply moves up to the cut line.
      */
     public LayoutCell withItemReplaced(int index, Element replacement) {
+        return withItemReplaced(index, replacement, elementTops[index]);
+    }
+
+    /**
+     * As {@link #withItemReplaced(int, Element)}, additionally moving the
+     * replaced item's top to {@code newTop} — used for the bottom piece of a
+     * split element, which starts at the cut instead of the original top.
+     */
+    public LayoutCell withItemReplaced(int index, Element replacement, float newTop) {
         List<Item> newItems = new ArrayList<>(items);
         Item original = newItems.get(index);
         newItems.set(index, new Item(replacement, original.x(), original.y()));
@@ -79,6 +88,7 @@ public final class LayoutCell {
         copy.virtualTop = virtualTop;
         copy.height = height;
         copy.elementTops = elementTops.clone();
+        copy.elementTops[index] = newTop;
         return copy;
     }
 
