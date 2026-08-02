@@ -1,0 +1,172 @@
+package io.github.the13thclown.pdftables;
+
+import io.github.the13thclown.pdftables.style.BorderStyle;
+import io.github.the13thclown.pdftables.style.HorizontalAlignment;
+import io.github.the13thclown.pdftables.style.Padding;
+import io.github.the13thclown.pdftables.style.Style;
+import io.github.the13thclown.pdftables.style.VerticalAlignment;
+
+import java.awt.Color;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * A cell definition: zero or more contents (stacked vertically), spans, and
+ * style. Pure definition — nothing is measured or validated against the grid
+ * until render time. Cells auto-flow into the table's grid in the order they
+ * are added to the table; there is no row object.
+ */
+public final class Cell {
+
+    /**
+     * A content and its placement inside the cell's content box: {@code x}/{@code y}
+     * are offsets from the box's top-left corner, or both null for normal flow
+     * (contents stack vertically).
+     */
+    public record ContentEntry(CellContent content, Float x, Float y) {
+
+        public boolean positioned() {
+            return x != null;
+        }
+    }
+
+    private final List<ContentEntry> contents;
+    private final int colSpan;
+    private final int rowSpan;
+    private final Style style;
+
+    private Cell(Builder b) {
+        this.contents = List.copyOf(b.contents);
+        this.colSpan = b.colSpan;
+        this.rowSpan = b.rowSpan;
+        Style shortcuts = b.styleShortcuts == null ? null : b.styleShortcuts.build();
+        if (shortcuts != null && b.style != null) {
+            this.style = shortcuts.mergedOnto(b.style);
+        } else if (shortcuts != null) {
+            this.style = shortcuts;
+        } else {
+            this.style = b.style;
+        }
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /** Shorthand for a cell with a single content and no other settings. */
+    public static Cell of(CellContent content) {
+        return builder().add(content).build();
+    }
+
+    public List<ContentEntry> contents() {
+        return contents;
+    }
+
+    public int colSpan() {
+        return colSpan;
+    }
+
+    public int rowSpan() {
+        return rowSpan;
+    }
+
+    /** The cell's own style, possibly null (inherit everything). */
+    public Style style() {
+        return style;
+    }
+
+    public static final class Builder {
+        private final List<ContentEntry> contents = new ArrayList<>();
+        private int colSpan = 1;
+        private int rowSpan = 1;
+        private Style style;
+        private Style.Builder styleShortcuts;
+
+        /** Adds a flowing content; flowing contents stack vertically inside the cell. */
+        public Builder add(CellContent content) {
+            contents.add(new ContentEntry(Objects.requireNonNull(content, "content"), null, null));
+            return this;
+        }
+
+        /**
+         * Adds a content at an arbitrary position inside the cell's content box:
+         * {@code x}/{@code y} offsets from the box's top-left corner. Positioned
+         * contents don't take part in the vertical flow — they sit exactly where
+         * placed (overlaps allowed) and stretch the cell as far down as they
+         * reach. Elements crossing a page break pass down whole, and the whole
+         * remaining arrangement continues on the next page shifted up as one
+         * rigid piece — relative positions are always preserved.
+         */
+        public Builder addAt(float x, float y, CellContent content) {
+            if (x < 0 || y < 0) {
+                throw new IllegalArgumentException("Position offsets must be >= 0");
+            }
+            contents.add(new ContentEntry(Objects.requireNonNull(content, "content"), x, y));
+            return this;
+        }
+
+        public Builder colSpan(int colSpan) {
+            if (colSpan < 1) {
+                throw new IllegalArgumentException("colSpan must be >= 1");
+            }
+            this.colSpan = colSpan;
+            return this;
+        }
+
+        public Builder rowSpan(int rowSpan) {
+            if (rowSpan < 1) {
+                throw new IllegalArgumentException("rowSpan must be >= 1");
+            }
+            this.rowSpan = rowSpan;
+            return this;
+        }
+
+        /** Base style for this cell; individual shortcut calls below win over it. */
+        public Builder style(Style style) {
+            this.style = style;
+            return this;
+        }
+
+        public Builder paddingAll(float padding) {
+            shortcuts().padding(Padding.of(padding));
+            return this;
+        }
+
+        public Builder padding(Padding padding) {
+            shortcuts().padding(padding);
+            return this;
+        }
+
+        public Builder backgroundColor(Color color) {
+            shortcuts().backgroundColor(color);
+            return this;
+        }
+
+        public Builder borderAll(BorderStyle border) {
+            shortcuts().borderAll(border);
+            return this;
+        }
+
+        public Builder horizontalAlignment(HorizontalAlignment alignment) {
+            shortcuts().horizontalAlignment(alignment);
+            return this;
+        }
+
+        public Builder verticalAlignment(VerticalAlignment alignment) {
+            shortcuts().verticalAlignment(alignment);
+            return this;
+        }
+
+        private Style.Builder shortcuts() {
+            if (styleShortcuts == null) {
+                styleShortcuts = Style.builder();
+            }
+            return styleShortcuts;
+        }
+
+        public Cell build() {
+            return new Cell(this);
+        }
+    }
+}
