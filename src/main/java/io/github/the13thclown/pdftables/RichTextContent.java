@@ -2,13 +2,12 @@ package io.github.the13thclown.pdftables;
 
 import io.github.the13thclown.pdftables.layout.Element;
 import io.github.the13thclown.pdftables.render.RenderContext;
+import io.github.the13thclown.pdftables.style.HorizontalAlignment;
+import io.github.the13thclown.pdftables.style.Style;
 import org.apache.pdfbox.pdmodel.font.PDFont;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
-import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 
 import java.awt.Color;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -20,13 +19,16 @@ import java.util.Objects;
  * Like {@link TextContent}, each wrapped line is one atomic {@link Element},
  * so rich text paginates line by line.
  * <p>
- * Fragment styles inherit the builder's base font/size/color where unset:
+ * Fragment styles inherit the builder's base where set, which in turn falls
+ * back to the cell's resolved style (cell → row → column → table default):
  * <pre>{@code
- * RichTextContent.builder().fontSize(10)
+ * RichTextContent.builder()
  *     .add("Total: ")
  *     .add(RichTextContent.fragment("123.45 EUR").font(bold).color(red))
  *     .build()
  * }</pre>
+ * {@link HorizontalAlignment#JUSTIFY} stretches wrapped lines (except a
+ * paragraph's last) by widening the inter-word gaps.
  */
 public final class RichTextContent implements CellContent {
 
@@ -70,9 +72,9 @@ public final class RichTextContent implements CellContent {
 
     private final List<Fragment> fragments;
     private final PDFont baseFont;
-    private final float baseFontSize;
+    private final Float baseFontSize;
     private final Color baseColor;
-    private final float lineSpacing;
+    private final Float lineSpacing;
 
     private RichTextContent(Builder b) {
         this.fragments = List.copyOf(b.fragments);
@@ -88,24 +90,33 @@ public final class RichTextContent implements CellContent {
 
     /** A run: a maximal same-styled piece of text with a fixed width. */
     private record Run(String text, PDFont font, float size, Color color, float width) {
+
+        boolean isSpace() {
+            return " ".equals(text);
+        }
     }
 
     @Override
-    public List<Element> layout(float availableWidth) {
+    public List<Element> layout(float availableWidth, Style style) {
+        PDFont base = baseFont != null ? baseFont : style.font();
+        float baseSize = baseFontSize != null ? baseFontSize : style.fontSize();
+        Color color = baseColor != null ? baseColor : style.textColor();
+        float spacing = lineSpacing != null ? lineSpacing : style.lineSpacing();
+
         // 1. resolve fragments against the base style and tokenize into words
         //    (runs joined without spaces merge into one word) and hard breaks
         List<Object> tokens = new ArrayList<>();     // List<Run>-words and NEWLINE markers
         List<Run> word = new ArrayList<>();
         for (Fragment f : fragments) {
-            PDFont font = f.font != null ? f.font : baseFont;
-            float size = f.fontSize != null ? f.fontSize : baseFontSize;
-            Color color = f.color != null ? f.color : baseColor;
+            PDFont font = f.font != null ? f.font : base;
+            float size = f.fontSize != null ? f.fontSize : baseSize;
+            Color fragColor = f.color != null ? f.color : color;
             StringBuilder piece = new StringBuilder();
             for (int i = 0; i < f.text.length(); i++) {
                 char c = f.text.charAt(i);
                 if (c == ' ' || c == '\n') {
                     if (!piece.isEmpty()) {
-                        word.add(run(piece.toString(), font, size, color));
+                        word.add(run(piece.toString(), font, size, fragColor));
                         piece.setLength(0);
                     }
                     if (!word.isEmpty()) {
@@ -120,21 +131,24 @@ public final class RichTextContent implements CellContent {
                 }
             }
             if (!piece.isEmpty()) {
-                word.add(run(piece.toString(), font, size, color));
+                word.add(run(piece.toString(), font, size, fragColor));
             }
         }
         if (!word.isEmpty()) {
             tokens.add(word);
         }
 
-        // 2. greedy line fill
+        // 2. greedy line fill; lines ended by wrapping (not by \n or the end)
+        //    are justifiable
         List<List<Run>> lines = new ArrayList<>();
+        List<Boolean> justifiables = new ArrayList<>();
         List<Run> line = new ArrayList<>();
         float lineWidth = 0;
         boolean lineHasContent = false;
         for (Object token : tokens) {
             if (token == NEWLINE) {
                 lines.add(line);
+                justifiables.add(false);
                 line = new ArrayList<>();
                 lineWidth = 0;
                 lineHasContent = false;
@@ -157,6 +171,7 @@ public final class RichTextContent implements CellContent {
             }
             if (lineHasContent) {
                 lines.add(line);
+                justifiables.add(true);
                 line = new ArrayList<>();
                 lineWidth = 0;
                 lineHasContent = false;
@@ -168,13 +183,14 @@ public final class RichTextContent implements CellContent {
                     while (!rest.isEmpty()) {
                         int fit = 1;
                         while (fit < rest.length()
-                                && lineWidth + widthOf(rest.substring(0, fit + 1), r.font(), r.size()) <= availableWidth + EPS) {
+                                && lineWidth + TextContent.widthOf(rest.substring(0, fit + 1), r.font(), r.size()) <= availableWidth + EPS) {
                             fit++;
                         }
                         String part = rest.substring(0, fit);
-                        float partWidth = widthOf(part, r.font(), r.size());
+                        float partWidth = TextContent.widthOf(part, r.font(), r.size());
                         if (lineWidth + partWidth > availableWidth + EPS && lineHasContent) {
                             lines.add(line);
+                            justifiables.add(true);
                             line = new ArrayList<>();
                             lineWidth = 0;
                             lineHasContent = false;
@@ -194,23 +210,26 @@ public final class RichTextContent implements CellContent {
         }
         if (lineHasContent || lines.isEmpty()) {
             lines.add(line);
+            justifiables.add(false);
         }
 
         List<Element> elements = new ArrayList<>(lines.size());
-        for (List<Run> l : lines) {
-            elements.add(new RichLineElement(List.copyOf(l), totalWidth(l), lineHeightOf(l), lineSpacing));
+        for (int i = 0; i < lines.size(); i++) {
+            List<Run> l = lines.get(i);
+            elements.add(new RichLineElement(List.copyOf(l), totalWidth(l),
+                    lineHeightOf(l, baseSize, spacing), justifiables.get(i)));
         }
         return elements;
     }
 
     private static final Object NEWLINE = new Object();
 
-    private float lineHeightOf(List<Run> line) {
-        float maxSize = baseFontSize;
+    private static float lineHeightOf(List<Run> line, float baseSize, float spacing) {
+        float maxSize = baseSize;
         for (Run r : line) {
             maxSize = Math.max(maxSize, r.size());
         }
-        return maxSize * lineSpacing;
+        return maxSize * spacing;
     }
 
     private static float totalWidth(List<Run> runs) {
@@ -222,39 +241,11 @@ public final class RichTextContent implements CellContent {
     }
 
     private static Run run(String text, PDFont font, float size, Color color) {
-        return new Run(safe(text, font), font, size, color, widthOf(safe(text, font), font, size));
+        String safeText = TextContent.safe(text, font);
+        return new Run(safeText, font, size, color, TextContent.widthOf(safeText, font, size));
     }
 
-    private static String safe(String text, PDFont font) {
-        try {
-            font.encode(text);
-            return text;
-        } catch (IOException | IllegalArgumentException e) {
-            StringBuilder sb = new StringBuilder(text.length());
-            for (int i = 0; i < text.length(); ) {
-                int cp = text.codePointAt(i);
-                String ch = new String(Character.toChars(cp));
-                try {
-                    font.encode(ch);
-                    sb.append(ch);
-                } catch (IOException | IllegalArgumentException notEncodable) {
-                    sb.append('?');
-                }
-                i += Character.charCount(cp);
-            }
-            return sb.toString();
-        }
-    }
-
-    private static float widthOf(String s, PDFont font, float size) {
-        try {
-            return font.getStringWidth(s) / 1000f * size;
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to measure text with font " + font.getName(), e);
-        }
-    }
-
-    private record RichLineElement(List<Run> runs, float lineWidth, float lineHeight, float lineSpacing)
+    private record RichLineElement(List<Run> runs, float lineWidth, float lineHeight, boolean justifiable)
             implements Element {
 
         @Override
@@ -267,11 +258,24 @@ public final class RichTextContent implements CellContent {
             if (runs.isEmpty()) {
                 return;
             }
-            float x = switch (ctx.style().horizontalAlignment()) {
-                case LEFT -> ctx.x();
+            HorizontalAlignment alignment = ctx.style().horizontalAlignment();
+            float x = switch (alignment) {
+                case LEFT, JUSTIFY -> ctx.x();
                 case CENTER -> ctx.x() + (ctx.width() - lineWidth) / 2;
                 case RIGHT -> ctx.x() + ctx.width() - lineWidth;
             };
+            float extraPerSpace = 0;
+            if (alignment == HorizontalAlignment.JUSTIFY && justifiable) {
+                int spaceRuns = 0;
+                for (Run r : runs) {
+                    if (r.isSpace()) {
+                        spaceRuns++;
+                    }
+                }
+                if (spaceRuns > 0) {
+                    extraPerSpace = (ctx.width() - lineWidth) / spaceRuns;
+                }
+            }
             // one shared baseline: center the tallest ascent-descent band in the box
             float maxAscent = 0;
             float minDescent = 0;
@@ -290,18 +294,21 @@ public final class RichTextContent implements CellContent {
                 ctx.stream().showText(r.text());
                 ctx.stream().endText();
                 cursor += r.width();
+                if (r.isSpace()) {
+                    cursor += extraPerSpace;
+                }
             }
         }
     }
 
     public static final class Builder {
         private final List<Fragment> fragments = new ArrayList<>();
-        private PDFont font = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
-        private float fontSize = 11;
-        private Color color = Color.BLACK;
-        private float lineSpacing = 1.2f;
+        private PDFont font;
+        private Float fontSize;
+        private Color color;
+        private Float lineSpacing;
 
-        /** Base font for fragments that don't set their own. */
+        /** Base font for fragments that don't set their own; defaults to the cell style. */
         public Builder font(PDFont font) {
             this.font = Objects.requireNonNull(font, "font");
             return this;
@@ -320,7 +327,7 @@ public final class RichTextContent implements CellContent {
             return this;
         }
 
-        /** Line height as a multiple of the tallest font size on each line; default 1.2. */
+        /** Line height as a multiple of the tallest font size on each line. */
         public Builder lineSpacing(float lineSpacing) {
             if (lineSpacing <= 0) {
                 throw new IllegalArgumentException("lineSpacing must be > 0");

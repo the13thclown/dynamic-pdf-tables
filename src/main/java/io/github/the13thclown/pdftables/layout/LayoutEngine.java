@@ -71,26 +71,40 @@ public final class LayoutEngine {
         return widths;
     }
 
-    /**
-     * Builds layout cells from grid placements: resolves each cell's style
-     * (cell onto table default onto defaults), computes its x/width from the
-     * columns, and lays out its contents into elements at the content width.
-     * The only place {@link CellContent#layout} is ever called.
-     */
     public static List<LayoutCell> buildCells(Table table, List<GridFlow.Placement> placements,
                                               float[] colWidths) {
+        return buildCells(table, placements, colWidths, Style.defaults());
+    }
+
+    /**
+     * Builds layout cells from grid placements: resolves each cell's style
+     * along the cascade cell → row styler → column styler → table default →
+     * {@code base}, computes its x/width from the columns, and lays out its
+     * contents into elements at the content width. The only place
+     * {@link io.github.the13thclown.pdftables.CellContent#layout} is ever
+     * called. {@code base} is normally {@link Style#defaults()}; nested tables
+     * pass their outer cell's text defaults so fonts inherit inward.
+     */
+    public static List<LayoutCell> buildCells(Table table, List<GridFlow.Placement> placements,
+                                              float[] colWidths, Style base) {
         float[] colX = new float[colWidths.length];
         for (int i = 1; i < colWidths.length; i++) {
             colX[i] = colX[i - 1] + colWidths[i - 1];
         }
         Style tableDefault = table.defaultStyle() == null
-                ? Style.defaults()
-                : table.defaultStyle().mergedOnto(Style.defaults());
+                ? base
+                : table.defaultStyle().mergedOnto(base);
 
         List<LayoutCell> cells = new ArrayList<>(placements.size());
         for (GridFlow.Placement p : placements) {
             Cell cell = p.cell();
             Style style = tableDefault;
+            if (table.columnStyler() != null) {
+                Style columnStyle = table.columnStyler().apply(p.col());
+                if (columnStyle != null) {
+                    style = columnStyle.mergedOnto(style);
+                }
+            }
             if (table.rowStyler() != null) {
                 Style rowStyle = table.rowStyler().apply(p.row());
                 if (rowStyle != null) {
@@ -107,7 +121,7 @@ public final class LayoutEngine {
             float contentWidth = Math.max(0, width - style.padding().horizontal());
             List<LayoutCell.Item> items = new ArrayList<>();
             for (Cell.ContentEntry entry : cell.contents()) {
-                List<Element> elements = entry.content().layout(contentWidth);
+                List<Element> elements = entry.content().layout(contentWidth, style);
                 if (entry.positioned()) {
                     // a positioned content's elements stack from its anchor point
                     float y = entry.y();

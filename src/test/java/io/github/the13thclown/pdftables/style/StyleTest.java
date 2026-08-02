@@ -22,6 +22,25 @@ class StyleTest {
     }
 
     @Test
+    void defaultsCarryTextDefaults() {
+        Style d = Style.defaults();
+        assertThat(d.font()).isNotNull();
+        assertThat(d.fontSize()).isEqualTo(11);
+        assertThat(d.textColor()).isEqualTo(Color.BLACK);
+        assertThat(d.lineSpacing()).isEqualTo(1.2f);
+    }
+
+    @Test
+    void textDefaultsRideTheMergeCascade() {
+        Style cell = Style.builder().fontSize(9).build();
+        Style table = Style.builder().textColor(Color.BLUE).fontSize(14).build();
+        Style merged = cell.mergedOnto(table).mergedOnto(Style.defaults());
+        assertThat(merged.fontSize()).isEqualTo(9);
+        assertThat(merged.textColor()).isEqualTo(Color.BLUE);
+        assertThat(merged.font()).isNotNull();
+    }
+
+    @Test
     void mergeTakesOwnFieldWhenSet() {
         Style own = Style.builder().padding(Padding.of(5)).build();
         Style fallback = Style.builder().padding(Padding.of(9)).backgroundColor(Color.RED).build();

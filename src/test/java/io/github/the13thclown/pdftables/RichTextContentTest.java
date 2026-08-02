@@ -1,6 +1,7 @@
 package io.github.the13thclown.pdftables;
 
 import io.github.the13thclown.pdftables.layout.Element;
+import io.github.the13thclown.pdftables.style.Style;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,7 @@ class RichTextContentTest {
                 .add(RichTextContent.fragment("123.45").font(BOLD).color(Color.RED))
                 .add(" EUR")
                 .build()
-                .layout(300);
+                .layout(300, Style.defaults());
         assertThat(lines).hasSize(1);
     }
 
@@ -34,7 +35,7 @@ class RichTextContentTest {
                 .add(RichTextContent.fragment("an emphasised span of several words").font(BOLD))
                 .add(" and a plain tail that also needs room.")
                 .build()
-                .layout(140);
+                .layout(140, Style.defaults());
         assertThat(lines.size()).isGreaterThan(2);
     }
 
@@ -46,7 +47,7 @@ class RichTextContentTest {
                 .add("wwwwwwww num")
                 .add(RichTextContent.fragment("ber").font(BOLD))
                 .build()
-                .layout(60);
+                .layout(60, Style.defaults());
         assertThat(lines).hasSize(2);
     }
 
@@ -57,7 +58,7 @@ class RichTextContentTest {
                 .add("small ")
                 .add(RichTextContent.fragment("BIG").fontSize(20))
                 .build()
-                .layout(500);
+                .layout(500, Style.defaults());
         assertThat(lines.get(0).getHeight()).isCloseTo(24, within(0.01f));
     }
 
@@ -66,7 +67,7 @@ class RichTextContentTest {
         List<Element> lines = RichTextContent.builder()
                 .add("one\ntwo")
                 .build()
-                .layout(500);
+                .layout(500, Style.defaults());
         assertThat(lines).hasSize(2);
     }
 
@@ -75,7 +76,7 @@ class RichTextContentTest {
         List<Element> lines = RichTextContent.builder()
                 .add(RichTextContent.fragment("Honorificabilitudinitatibus").font(BOLD))
                 .build()
-                .layout(40);
+                .layout(40, Style.defaults());
         assertThat(lines.size()).isGreaterThan(1);
     }
 }

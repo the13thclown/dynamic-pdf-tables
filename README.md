@@ -66,9 +66,10 @@ try (PDDocument doc = new PDDocument()) {
 ## Features (v1)
 
 - Fixed and relative column widths
-- Padding, per-side borders (thicker border wins at shared edges), background colors, horizontal/vertical alignment
-- Style inheritance: cell → row styler → table default → built-in defaults (field-level, non-null wins)
-- Per-row styling without row objects: `rowStyler(rowIndex -> Style)` (zebra striping etc.)
+- Padding, per-side borders (thicker border wins at shared edges), background colors, horizontal/vertical alignment incl. `JUSTIFY`
+- Style cascade: cell → row styler → column styler → table default → built-in defaults (field-level, non-null wins)
+- Inheritable text defaults on `Style` (font, size, color, line spacing): declare "this table is 9pt" once — flows into nested tables too
+- Per-row and per-column styling without row objects: `rowStyler(rowIndex -> Style)`, `columnStyler(colIndex -> Style)`
 - `colSpan` / `rowSpan` with automatic grid flow; configurable rowspan height distribution (`EQUAL` / `LAST_ROW`)
 - Arbitrary content placement inside a cell: `Cell.Builder.addAt(x, y, content)` — offsets from the content box, overlaps allowed, arrangement preserved across page breaks
 - Text: `TextContent.builder("...").font(F).fontSize(10).color(c).lineSpacing(1.3f)` — wraps at the content width (spaces, `\n`, mid-word for overlong words), aligns per cell style, splits across pages line by line; unencodable characters become `?`
@@ -77,7 +78,9 @@ try (PDDocument doc = new PDDocument()) {
 - Nested tables: `TableContent.of(innerTable)` — inner rows become atomic elements, so nested tables split across pages at inner row boundaries (any depth)
 - Automatic page breaks at element granularity — rows and cells split mid-cell; cut cells draw open by default, or closed on both sides of the break via `TableDrawer.Builder.closeBordersAtPageBreak(true)`
 - Repeating header rows on every page (never split)
+- Vertical (90° rotated) text: `VerticalTextContent.of("Q1")` for narrow header columns
 - Multiple multi-page tables on a shared page sequence (side by side): the `pageSupplier` may return existing pages
+- Same-page overflow columns: `TableDrawer.Builder.overflowColumns(3, gap)` — a narrow table fills column regions across the page before starting a new one, headers repeating per region
 - Structural validation at render start (`TableValidationException`);
   impossible pagination (element taller than a page, oversized headers) throws `TableLayoutException`
 

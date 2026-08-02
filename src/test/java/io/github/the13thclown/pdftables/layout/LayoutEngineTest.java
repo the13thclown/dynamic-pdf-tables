@@ -158,6 +158,44 @@ class LayoutEngineTest {
     }
 
     @Test
+    void columnStylerSitsBetweenRowStylerAndTableDefault() {
+        java.awt.Color tableColor = java.awt.Color.GRAY;
+        java.awt.Color col0 = java.awt.Color.CYAN;
+        java.awt.Color row1 = java.awt.Color.ORANGE;
+        Table t = Table.builder().addColumnsOfWidth(100, 100)
+                .defaultStyle(io.github.the13thclown.pdftables.style.Style.builder()
+                        .backgroundColor(tableColor).build())
+                .columnStyler(col -> col == 0
+                        ? io.github.the13thclown.pdftables.style.Style.builder().backgroundColor(col0).build()
+                        : null)
+                .rowStyler(row -> row == 1
+                        ? io.github.the13thclown.pdftables.style.Style.builder().backgroundColor(row1).build()
+                        : null)
+                .add(Cell.of(PlaceholderContent.ofHeight(10)))   // (0,0) column styler
+                .add(Cell.of(PlaceholderContent.ofHeight(10)))   // (0,1) table default
+                .add(Cell.of(PlaceholderContent.ofHeight(10)))   // (1,0) row styler beats column styler
+                .add(Cell.of(PlaceholderContent.ofHeight(10)))   // (1,1) row styler
+                .build();
+        VirtualLayout l = layoutOf(t);
+        assertThat(l.cells().get(0).style().backgroundColor()).isEqualTo(col0);
+        assertThat(l.cells().get(1).style().backgroundColor()).isEqualTo(tableColor);
+        assertThat(l.cells().get(2).style().backgroundColor()).isEqualTo(row1);
+        assertThat(l.cells().get(3).style().backgroundColor()).isEqualTo(row1);
+    }
+
+    @Test
+    void tableLevelFontSizeFlowsIntoTextContents() {
+        Table t = Table.builder().addColumnsOfWidth(200)
+                .defaultStyle(io.github.the13thclown.pdftables.style.Style.builder()
+                        .fontSize(20).build())
+                .add(Cell.of(io.github.the13thclown.pdftables.TextContent.of("x")))
+                .build();
+        VirtualLayout l = layoutOf(t);
+        // one line at 20pt * default 1.2 spacing
+        assertThat(l.rowHeights()[0]).isCloseTo(24, within(0.01f));
+    }
+
+    @Test
     void positionedContentStretchesRowToItsDeepestPoint() {
         Table t = Table.builder().addColumnsOfWidth(200)
                 .add(Cell.builder()

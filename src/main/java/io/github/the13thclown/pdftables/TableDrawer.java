@@ -39,6 +39,8 @@ public final class TableDrawer {
     private final Float startYOnNewPages;
     private final Supplier<PDPage> pageSupplier;
     private final boolean closeBordersAtPageBreak;
+    private final int overflowColumns;
+    private final float columnGap;
 
     private TableDrawer(Builder b) {
         this.document = b.document;
@@ -50,6 +52,8 @@ public final class TableDrawer {
         this.startYOnNewPages = b.startYOnNewPages;
         this.pageSupplier = b.pageSupplier;
         this.closeBordersAtPageBreak = b.closeBordersAtPageBreak;
+        this.overflowColumns = b.overflowColumns;
+        this.columnGap = b.columnGap;
     }
 
     public static Builder builder() {
@@ -87,15 +91,23 @@ public final class TableDrawer {
                     table.rowSpanDistribution());
         }
 
+        float tableWidth = 0;
+        for (float w : colWidths) {
+            tableWidth += w;
+        }
+
         boolean firstPage = true;
-        int pagesDrawn = 0;
+        boolean continuation = false;   // any slice after the very first (column or page)
+        int columnIndex = 0;
+        int slicesDrawn = 0;
         while (true) {
-            if (++pagesDrawn > MAX_PAGES) {
-                throw new TableLayoutException("Table did not finish within " + MAX_PAGES + " pages");
+            if (++slicesDrawn > MAX_PAGES) {
+                throw new TableLayoutException("Table did not finish within " + MAX_PAGES + " slices");
             }
+            float originX = startX + columnIndex * (tableWidth + columnGap);
             float capacity = pageTop - endY;
             VirtualLayout headerToDraw = null;
-            if (!firstPage && header != null) {
+            if (continuation && header != null) {
                 if (header.totalHeight() >= capacity - EPS) {
                     throw new TableLayoutException(
                             "Repeated header rows (" + header.totalHeight()
@@ -104,7 +116,7 @@ public final class TableDrawer {
                 headerToDraw = header;
                 capacity -= header.totalHeight();
             }
-            if (firstPage && header != null && header.totalHeight() > capacity + EPS) {
+            if (!continuation && header != null && header.totalHeight() > capacity + EPS) {
                 throw new TableLayoutException(
                         "Header rows (" + header.totalHeight()
                                 + "pt) are taller than the first page capacity (" + capacity + "pt); headers never split");
@@ -115,9 +127,9 @@ public final class TableDrawer {
             try (PDPageContentStream cs = new PDPageContentStream(
                     document, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
                 if (headerToDraw != null) {
-                    LayoutRenderer.render(document, cs, headerToDraw, 0, headerToDraw.totalHeight(), startX, pageTop);
+                    LayoutRenderer.render(document, cs, headerToDraw, 0, headerToDraw.totalHeight(), originX, pageTop);
                 }
-                LayoutRenderer.render(document, cs, current, 0, cut.cutY(), startX, bodyTop, closeBordersAtPageBreak);
+                LayoutRenderer.render(document, cs, current, 0, cut.cutY(), originX, bodyTop, closeBordersAtPageBreak);
             }
             if (cut.finished()) {
                 return bodyTop - cut.cutY();
@@ -133,6 +145,13 @@ public final class TableDrawer {
                                 + next.totalHeight() + "pt) is taller than the page capacity of " + capacity + "pt");
             }
             current = next;
+            continuation = true;
+            columnIndex++;
+            if (columnIndex < overflowColumns) {
+                // overflow into the next column region on the same page
+                continue;
+            }
+            columnIndex = 0;
             page = pageSupplier.get();
             addPageIfAbsent(page);
             pageTop = startYOnNewPages != null ? startYOnNewPages : defaultTop(page);
@@ -168,6 +187,8 @@ public final class TableDrawer {
         private Float startYOnNewPages;
         private Supplier<PDPage> pageSupplier = () -> new PDPage(PDRectangle.A4);
         private boolean closeBordersAtPageBreak;
+        private int overflowColumns = 1;
+        private float columnGap = 20;
 
         public Builder document(PDDocument document) {
             this.document = document;
@@ -228,6 +249,24 @@ public final class TableDrawer {
          */
         public Builder closeBordersAtPageBreak(boolean close) {
             this.closeBordersAtPageBreak = close;
+            return this;
+        }
+
+        /**
+         * Lets a narrow table overflow into further column regions on the
+         * SAME page before starting a new one: region {@code k} starts at
+         * {@code startX + k * (tableWidth + gap)}. Repeating headers repeat
+         * per column region. Default: 1 column (no same-page overflow).
+         */
+        public Builder overflowColumns(int columns, float gap) {
+            if (columns < 1) {
+                throw new IllegalArgumentException("overflowColumns must be >= 1");
+            }
+            if (gap < 0) {
+                throw new IllegalArgumentException("gap must be >= 0");
+            }
+            this.overflowColumns = columns;
+            this.columnGap = gap;
             return this;
         }
 

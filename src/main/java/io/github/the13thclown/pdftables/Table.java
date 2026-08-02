@@ -26,6 +26,7 @@ public final class Table {
     private final float minRowHeight;
     private final Style defaultStyle;
     private final IntFunction<Style> rowStyler;
+    private final IntFunction<Style> columnStyler;
     private final RowSpanDistribution rowSpanDistribution;
 
     private Table(Builder b) {
@@ -36,6 +37,7 @@ public final class Table {
         this.minRowHeight = b.minRowHeight;
         this.defaultStyle = b.defaultStyle;
         this.rowStyler = b.rowStyler;
+        this.columnStyler = b.columnStyler;
         this.rowSpanDistribution = b.rowSpanDistribution;
     }
 
@@ -70,9 +72,14 @@ public final class Table {
         return defaultStyle;
     }
 
-    /** Style per derived row index, possibly null; sits between cell style and table default. */
+    /** Style per derived row index, possibly null; sits between cell style and column styler. */
     public IntFunction<Style> rowStyler() {
         return rowStyler;
+    }
+
+    /** Style per column index, possibly null; sits between row styler and table default. */
+    public IntFunction<Style> columnStyler() {
+        return columnStyler;
     }
 
     public RowSpanDistribution rowSpanDistribution() {
@@ -87,6 +94,7 @@ public final class Table {
         private float minRowHeight;
         private Style defaultStyle;
         private IntFunction<Style> rowStyler;
+        private IntFunction<Style> columnStyler;
         private RowSpanDistribution rowSpanDistribution = RowSpanDistribution.EQUAL;
 
         /** Explicit table width; required if any column has a relative width. */
@@ -154,6 +162,17 @@ public final class Table {
          */
         public Builder rowStyler(IntFunction<Style> rowStyler) {
             this.rowStyler = rowStyler;
+            return this;
+        }
+
+        /**
+         * Style applied per column index (0-based). Cascade: cell wins over
+         * row styler wins over column styler wins over table default. Spanning
+         * cells take the style of their anchor (leftmost) column. Returning
+         * null for a column means "nothing at this layer".
+         */
+        public Builder columnStyler(IntFunction<Style> columnStyler) {
+            this.columnStyler = columnStyler;
             return this;
         }
 

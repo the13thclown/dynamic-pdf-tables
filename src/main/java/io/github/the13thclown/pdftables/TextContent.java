@@ -2,9 +2,9 @@ package io.github.the13thclown.pdftables;
 
 import io.github.the13thclown.pdftables.layout.Element;
 import io.github.the13thclown.pdftables.render.RenderContext;
+import io.github.the13thclown.pdftables.style.HorizontalAlignment;
+import io.github.the13thclown.pdftables.style.Style;
 import org.apache.pdfbox.pdmodel.font.PDFont;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
-import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 
 import java.awt.Color;
 import java.io.IOException;
@@ -19,10 +19,15 @@ import java.util.Objects;
  * across pages line by line, exactly like every other content type, with no
  * special handling in the engine.
  * <p>
+ * Font, size, color and line spacing left unset here fall back to the cell's
+ * resolved style (cell → row → column → table default) — so a table-wide
+ * "9pt" is declared once on the table's default style.
+ * <p>
  * Wrapping: lines break at spaces; explicit {@code \n} forces a break; a word
  * wider than the available width splits mid-word. Characters the font cannot
  * encode are replaced with {@code ?} instead of failing. Horizontal alignment
- * comes from the resolved cell style at draw time.
+ * comes from the resolved cell style; {@link HorizontalAlignment#JUSTIFY}
+ * stretches every wrapped line except a paragraph's last.
  */
 public final class TextContent implements CellContent {
 
@@ -30,9 +35,9 @@ public final class TextContent implements CellContent {
 
     private final String text;
     private final PDFont font;
-    private final float fontSize;
+    private final Float fontSize;
     private final Color color;
-    private final float lineSpacing;
+    private final Float lineSpacing;
 
     private TextContent(Builder b) {
         this.text = b.text;
@@ -42,7 +47,7 @@ public final class TextContent implements CellContent {
         this.lineSpacing = b.lineSpacing;
     }
 
-    /** Text with defaults: Helvetica 11pt, black, 1.2 line spacing. */
+    /** Text styled entirely by the cell's resolved style defaults. */
     public static TextContent of(String text) {
         return builder(text).build();
     }
@@ -52,18 +57,27 @@ public final class TextContent implements CellContent {
     }
 
     @Override
-    public List<Element> layout(float availableWidth) {
-        float lineHeight = fontSize * lineSpacing;
-        List<Element> lines = new ArrayList<>();
+    public List<Element> layout(float availableWidth, Style style) {
+        PDFont font = this.font != null ? this.font : style.font();
+        float size = this.fontSize != null ? this.fontSize : style.fontSize();
+        Color color = this.color != null ? this.color : style.textColor();
+        float spacing = this.lineSpacing != null ? this.lineSpacing : style.lineSpacing();
+        float lineHeight = size * spacing;
+
+        List<Element> elements = new ArrayList<>();
         for (String paragraph : text.split("\n", -1)) {
-            for (String line : wrap(paragraph, availableWidth)) {
-                lines.add(new TextLineElement(line, widthOf(line), this, lineHeight));
+            List<String> lines = wrap(paragraph, availableWidth, font, size);
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i);
+                boolean justifiable = i < lines.size() - 1;   // never a paragraph's last line
+                elements.add(new TextLineElement(line, widthOf(line, font, size),
+                        font, size, color, lineHeight, spaceCount(line), justifiable));
             }
         }
-        return lines;
+        return elements;
     }
 
-    private List<String> wrap(String paragraph, float availableWidth) {
+    private List<String> wrap(String paragraph, float availableWidth, PDFont font, float size) {
         List<String> lines = new ArrayList<>();
         String[] words = paragraph.trim().split(" +");
         StringBuilder current = new StringBuilder();
@@ -71,9 +85,9 @@ public final class TextContent implements CellContent {
             if (word.isEmpty()) {
                 continue;
             }
-            word = safe(word);
+            word = safe(word, font);
             String candidate = current.isEmpty() ? word : current + " " + word;
-            if (widthOf(candidate) <= availableWidth + EPS) {
+            if (widthOf(candidate, font, size) <= availableWidth + EPS) {
                 current = new StringBuilder(candidate);
                 continue;
             }
@@ -82,9 +96,10 @@ public final class TextContent implements CellContent {
                 current = new StringBuilder();
             }
             // a word wider than the whole line splits mid-word
-            while (widthOf(word) > availableWidth + EPS && word.length() > 1) {
+            while (widthOf(word, font, size) > availableWidth + EPS && word.length() > 1) {
                 int fit = 1;
-                while (fit < word.length() && widthOf(word.substring(0, fit + 1)) <= availableWidth + EPS) {
+                while (fit < word.length()
+                        && widthOf(word.substring(0, fit + 1), font, size) <= availableWidth + EPS) {
                     fit++;
                 }
                 lines.add(word.substring(0, fit));
@@ -98,8 +113,18 @@ public final class TextContent implements CellContent {
         return lines;
     }
 
+    private static int spaceCount(String line) {
+        int n = 0;
+        for (int i = 0; i < line.length(); i++) {
+            if (line.charAt(i) == ' ') {
+                n++;
+            }
+        }
+        return n;
+    }
+
     /** Replaces characters the font cannot encode with '?'. */
-    private String safe(String word) {
+    static String safe(String word, PDFont font) {
         try {
             font.encode(word);
             return word;
@@ -120,15 +145,16 @@ public final class TextContent implements CellContent {
         }
     }
 
-    private float widthOf(String s) {
+    static float widthOf(String s, PDFont font, float size) {
         try {
-            return font.getStringWidth(s) / 1000f * fontSize;
+            return font.getStringWidth(s) / 1000f * size;
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to measure text with font " + font.getName(), e);
         }
     }
 
-    private record TextLineElement(String line, float lineWidth, TextContent style, float lineHeight)
+    private record TextLineElement(String line, float lineWidth, PDFont font, float size,
+                                   Color color, float lineHeight, int spaces, boolean justifiable)
             implements Element {
 
         @Override
@@ -141,31 +167,39 @@ public final class TextContent implements CellContent {
             if (line.isEmpty()) {
                 return;
             }
-            float x = switch (ctx.style().horizontalAlignment()) {
-                case LEFT -> ctx.x();
+            HorizontalAlignment alignment = ctx.style().horizontalAlignment();
+            float x = switch (alignment) {
+                case LEFT, JUSTIFY -> ctx.x();
                 case CENTER -> ctx.x() + (ctx.width() - lineWidth) / 2;
                 case RIGHT -> ctx.x() + ctx.width() - lineWidth;
             };
             // center the font's ascent-to-descent band within the line box
-            float ascent = style.font.getFontDescriptor().getAscent() / 1000f * style.fontSize;
-            float descent = style.font.getFontDescriptor().getDescent() / 1000f * style.fontSize;
+            float ascent = font.getFontDescriptor().getAscent() / 1000f * size;
+            float descent = font.getFontDescriptor().getDescent() / 1000f * size;
             float baseline = ctx.y() + (lineHeight - (ascent - descent)) / 2 - descent;
 
-            ctx.stream().setNonStrokingColor(style.color);
+            boolean justify = alignment == HorizontalAlignment.JUSTIFY && justifiable && spaces > 0;
+            ctx.stream().setNonStrokingColor(color);
             ctx.stream().beginText();
-            ctx.stream().setFont(style.font, style.fontSize);
+            ctx.stream().setFont(font, size);
+            if (justify) {
+                ctx.stream().setWordSpacing((ctx.width() - lineWidth) / spaces);
+            }
             ctx.stream().newLineAtOffset(x, baseline);
             ctx.stream().showText(line);
+            if (justify) {
+                ctx.stream().setWordSpacing(0);
+            }
             ctx.stream().endText();
         }
     }
 
     public static final class Builder {
         private final String text;
-        private PDFont font = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
-        private float fontSize = 11;
-        private Color color = Color.BLACK;
-        private float lineSpacing = 1.2f;
+        private PDFont font;
+        private Float fontSize;
+        private Color color;
+        private Float lineSpacing;
 
         private Builder(String text) {
             this.text = Objects.requireNonNull(text, "text");
@@ -189,7 +223,7 @@ public final class TextContent implements CellContent {
             return this;
         }
 
-        /** Line height as a multiple of the font size; default 1.2. */
+        /** Line height as a multiple of the font size. */
         public Builder lineSpacing(float lineSpacing) {
             if (lineSpacing <= 0) {
                 throw new IllegalArgumentException("lineSpacing must be > 0");

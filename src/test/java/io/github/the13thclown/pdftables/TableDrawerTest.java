@@ -484,6 +484,87 @@ class TableDrawerTest {
     }
 
     @Test
+    void justifiedTextStretchesWrappedLines() throws IOException {
+        String para = "Justified text stretches every wrapped line to the full content width "
+                + "by widening the gaps between words, while the last line of the paragraph "
+                + "stays at its natural width like in any book.";
+        Table table = Table.builder()
+                .addColumnsOfWidth(220, 220)
+                .defaultStyle(Style.builder().borderAll(BorderStyle.of(0.7f))
+                        .padding(io.github.the13thclown.pdftables.style.Padding.of(8))
+                        .fontSize(10).build())
+                .add(Cell.builder().add(TextContent.of(para))
+                        .horizontalAlignment(HorizontalAlignment.JUSTIFY).build())
+                .add(Cell.of(TextContent.of(para)))     // left-aligned for comparison
+                .add(Cell.builder().add(RichTextContent.builder()
+                                .add("Rich text justifies too: ")
+                                .add(RichTextContent.fragment("styled spans").fontSize(12))
+                                .add(" flow inside the stretched lines without breaking the "
+                                        + "shared baseline or the word gaps around them.")
+                                .build())
+                        .horizontalAlignment(HorizontalAlignment.JUSTIFY).build())
+                .add(Cell.of(TextContent.of("Short.")))
+                .build();
+        try (PDDocument doc = new PDDocument()) {
+            TableDrawer.builder().document(doc).table(table).build().draw();
+            save(doc, "justified-text.pdf");
+        }
+    }
+
+    @Test
+    void verticalTextRendersRotatedInNarrowColumns() throws IOException {
+        Table.Builder b = Table.builder()
+                .addColumnsOfWidth(150, 30, 30, 30)
+                .defaultStyle(Style.builder().borderAll(BorderStyle.of(0.7f))
+                        .padding(io.github.the13thclown.pdftables.style.Padding.of(4))
+                        .fontSize(9).build())
+                .add(Cell.of(TextContent.of("Criterion")))
+                .add(Cell.builder().add(VerticalTextContent.of("First quarter"))
+                        .horizontalAlignment(HorizontalAlignment.CENTER).build())
+                .add(Cell.builder().add(VerticalTextContent.of("Second quarter"))
+                        .horizontalAlignment(HorizontalAlignment.CENTER).build())
+                .add(Cell.builder().add(VerticalTextContent.of("Q3\nand Q4"))
+                        .horizontalAlignment(HorizontalAlignment.CENTER).build());
+        for (int i = 1; i <= 3; i++) {
+            b.add(Cell.of(TextContent.of("Row " + i)));
+            for (int c = 0; c < 3; c++) {
+                b.add(Cell.builder().add(PlaceholderContent.ofSize(14, 14))
+                        .horizontalAlignment(HorizontalAlignment.CENTER).build());
+            }
+        }
+        try (PDDocument doc = new PDDocument()) {
+            TableDrawer.builder().document(doc).table(b.build()).build().draw();
+            assertThat(doc.getNumberOfPages()).isEqualTo(1);
+            save(doc, "vertical-text.pdf");
+        }
+    }
+
+    @Test
+    void overflowColumnsFillThePageBeforeStartingANewOne() throws IOException {
+        Table.Builder b = Table.builder()
+                .addColumnsOfWidth(60, 90)
+                .defaultStyle(Style.builder().borderAll(BorderStyle.of(0.7f))
+                        .padding(io.github.the13thclown.pdftables.style.Padding.of(4))
+                        .fontSize(9).build())
+                .headerRowCount(1)
+                .add(headerCell("#"))
+                .add(headerCell("Value"));
+        for (int i = 1; i <= 120; i++) {
+            b.add(Cell.of(TextContent.of(String.valueOf(i))));
+            b.add(Cell.of(TextContent.of("Value " + i)));
+        }
+        // ~121 rows of ~19pt: far too tall for one page, but three 150pt-wide
+        // column regions fit side by side and absorb most of it on page 1
+        try (PDDocument doc = new PDDocument()) {
+            TableDrawer.builder().document(doc).table(b.build())
+                    .overflowColumns(3, 25)
+                    .build().draw();
+            assertThat(doc.getNumberOfPages()).isEqualTo(2);
+            save(doc, "overflow-columns.pdf");
+        }
+    }
+
+    @Test
     void elementTallerThanAPageThrows() throws IOException {
         Table table = Table.builder()
                 .addColumnOfWidth(200)

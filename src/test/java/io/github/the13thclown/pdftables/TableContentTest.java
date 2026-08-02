@@ -1,6 +1,7 @@
 package io.github.the13thclown.pdftables;
 
 import io.github.the13thclown.pdftables.layout.Element;
+import io.github.the13thclown.pdftables.style.Style;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -18,7 +19,7 @@ class TableContentTest {
                 .add(Cell.of(PlaceholderContent.ofHeight(20)))
                 .add(Cell.of(PlaceholderContent.ofHeight(20)))
                 .build();
-        List<Element> elements = TableContent.of(inner).layout(200);
+        List<Element> elements = TableContent.of(inner).layout(200, Style.defaults());
         assertThat(elements).hasSize(2);
         assertThat(elements.get(0).getHeight()).isCloseTo(50, within(0.01f));
         assertThat(elements.get(1).getHeight()).isCloseTo(20, within(0.01f));
@@ -33,7 +34,7 @@ class TableContentTest {
                 .add(Cell.of(PlaceholderContent.ofHeight(20)))
                 .add(Cell.of(PlaceholderContent.ofHeight(20)))
                 .build();
-        List<Element> elements = TableContent.of(inner).layout(200);
+        List<Element> elements = TableContent.of(inner).layout(200, Style.defaults());
         // rows 0+1 are tied by the rowspan -> one 80pt block; row 2 is its own
         assertThat(elements).hasSize(2);
         assertThat(elements.get(0).getHeight()).isCloseTo(80, within(0.01f));
@@ -49,13 +50,13 @@ class TableContentTest {
                 .add(Cell.of(PlaceholderContent.ofHeight(10)))
                 .build();
         // no explicit width: the cell's content width (280) is the fallback
-        List<Element> elements = TableContent.of(inner).layout(280);
+        List<Element> elements = TableContent.of(inner).layout(280, Style.defaults());
         assertThat(elements).hasSize(1);
     }
 
     @Test
     void emptyInnerTableYieldsNoElements() {
         Table inner = Table.builder().addColumnOfWidth(100).build();
-        assertThat(TableContent.of(inner).layout(200)).isEmpty();
+        assertThat(TableContent.of(inner).layout(200, Style.defaults())).isEmpty();
     }
 }

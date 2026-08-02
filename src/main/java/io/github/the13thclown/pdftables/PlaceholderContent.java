@@ -40,7 +40,7 @@ public final class PlaceholderContent implements CellContent {
     }
 
     @Override
-    public List<Element> layout(float availableWidth) {
+    public List<Element> layout(float availableWidth, io.github.the13thclown.pdftables.style.Style style) {
         float w = width == null ? availableWidth : Math.min(width, availableWidth);
         return List.of(new PlaceholderElement(Math.max(0, w), height));
     }
@@ -58,7 +58,7 @@ public final class PlaceholderContent implements CellContent {
                 return;
             }
             float x = switch (ctx.style().horizontalAlignment()) {
-                case LEFT -> ctx.x();
+                case LEFT, JUSTIFY -> ctx.x();
                 case CENTER -> ctx.x() + (ctx.width() - rectWidth) / 2;
                 case RIGHT -> ctx.x() + ctx.width() - rectWidth;
             };

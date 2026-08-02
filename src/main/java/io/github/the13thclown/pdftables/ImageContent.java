@@ -84,7 +84,7 @@ public final class ImageContent implements CellContent {
     }
 
     @Override
-    public java.util.List<Element> layout(float availableWidth) {
+    public java.util.List<Element> layout(float availableWidth, io.github.the13thclown.pdftables.style.Style style) {
         float aspect = (float) pixelHeight / pixelWidth;
         float w;
         float h;
@@ -132,7 +132,7 @@ public final class ImageContent implements CellContent {
         @Override
         public void draw(RenderContext ctx) throws IOException {
             float x = switch (ctx.style().horizontalAlignment()) {
-                case LEFT -> ctx.x();
+                case LEFT, JUSTIFY -> ctx.x();
                 case CENTER -> ctx.x() + (ctx.width() - drawWidth) / 2;
                 case RIGHT -> ctx.x() + ctx.width() - drawWidth;
             };

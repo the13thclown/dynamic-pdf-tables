@@ -38,13 +38,23 @@ public final class TableContent implements CellContent {
     }
 
     @Override
-    public List<Element> layout(float availableWidth) {
+    public List<Element> layout(float availableWidth, io.github.the13thclown.pdftables.style.Style style) {
         GridFlow.Result grid = GridFlow.flow(table);
         if (grid.placements().isEmpty()) {
             return List.of();
         }
         float[] colWidths = LayoutEngine.resolveColumns(table, availableWidth);
-        List<LayoutCell> cells = LayoutEngine.buildCells(table, grid.placements(), colWidths);
+        // only the outer cell's TEXT defaults flow into the inner table — box
+        // styling (borders, background, alignment) must not leak inward
+        io.github.the13thclown.pdftables.style.Style textBase =
+                io.github.the13thclown.pdftables.style.Style.builder()
+                        .font(style.font())
+                        .fontSize(style.fontSize())
+                        .textColor(style.textColor())
+                        .lineSpacing(style.lineSpacing())
+                        .build()
+                        .mergedOnto(io.github.the13thclown.pdftables.style.Style.defaults());
+        List<LayoutCell> cells = LayoutEngine.buildCells(table, grid.placements(), colWidths, textBase);
         VirtualLayout inner = LayoutEngine.compute(cells, grid.rowCount(), table.minRowHeight(),
                 false, table.rowSpanDistribution());
 

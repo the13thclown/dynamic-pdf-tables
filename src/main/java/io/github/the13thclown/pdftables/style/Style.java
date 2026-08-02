@@ -1,13 +1,23 @@
 package io.github.the13thclown.pdftables.style;
 
+import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+
 import java.awt.Color;
 
 /**
  * Visual settings for a cell. Every field is nullable; {@code null} means
- * "not set here — inherit". Styles are combined at render time with
- * {@link #mergedOnto(Style)}: cell style onto table default onto {@link #defaults()},
- * field by field, first non-null wins. {@link #defaults()} has every field non-null,
- * so a fully merged style never exposes null.
+ * "not set here — inherit". Styles are combined at render time along the
+ * cascade cell → row styler → column styler → table default → {@link #defaults()},
+ * field by field, first non-null wins. {@link #defaults()} has every field non-null
+ * (except backgroundColor), so a fully merged style never exposes null.
+ * <p>
+ * Besides box styling (padding, borders, background, alignment), a style
+ * carries inheritable <em>text defaults</em> — font, font size, text color and
+ * line spacing — which text contents fall back to for properties they don't
+ * set themselves. Declaring "this table is 9pt" once on the table default
+ * style is enough.
  */
 public final class Style {
 
@@ -19,6 +29,10 @@ public final class Style {
             .borderLeft(BorderStyle.NONE)
             .horizontalAlignment(HorizontalAlignment.LEFT)
             .verticalAlignment(VerticalAlignment.TOP)
+            .font(new PDType1Font(Standard14Fonts.FontName.HELVETICA))
+            .fontSize(11)
+            .textColor(Color.BLACK)
+            .lineSpacing(1.2f)
             .build();
     // backgroundColor stays null in DEFAULTS: "no background" is modeled as null
     // after merging, so renderers skip the fill instead of painting white.
@@ -31,6 +45,10 @@ public final class Style {
     private final Color backgroundColor;
     private final HorizontalAlignment horizontalAlignment;
     private final VerticalAlignment verticalAlignment;
+    private final PDFont font;
+    private final Float fontSize;
+    private final Color textColor;
+    private final Float lineSpacing;
 
     private Style(Builder b) {
         this.padding = b.padding;
@@ -41,13 +59,20 @@ public final class Style {
         this.backgroundColor = b.backgroundColor;
         this.horizontalAlignment = b.horizontalAlignment;
         this.verticalAlignment = b.verticalAlignment;
+        this.font = b.font;
+        this.fontSize = b.fontSize;
+        this.textColor = b.textColor;
+        this.lineSpacing = b.lineSpacing;
     }
 
     public static Builder builder() {
         return new Builder();
     }
 
-    /** The base style every merge chain ends on: no padding, no borders, no background, LEFT/TOP. */
+    /**
+     * The base style every merge chain ends on: no padding, no borders, no
+     * background, LEFT/TOP, Helvetica 11pt black text with 1.2 line spacing.
+     */
     public static Style defaults() {
         return DEFAULTS;
     }
@@ -66,6 +91,10 @@ public final class Style {
         b.backgroundColor = backgroundColor != null ? backgroundColor : fallback.backgroundColor;
         b.horizontalAlignment = horizontalAlignment != null ? horizontalAlignment : fallback.horizontalAlignment;
         b.verticalAlignment = verticalAlignment != null ? verticalAlignment : fallback.verticalAlignment;
+        b.font = font != null ? font : fallback.font;
+        b.fontSize = fontSize != null ? fontSize : fallback.fontSize;
+        b.textColor = textColor != null ? textColor : fallback.textColor;
+        b.lineSpacing = lineSpacing != null ? lineSpacing : fallback.lineSpacing;
         return new Style(b);
     }
 
@@ -101,6 +130,24 @@ public final class Style {
         return verticalAlignment;
     }
 
+    /** Default font for text contents that don't set their own. */
+    public PDFont font() {
+        return font;
+    }
+
+    public Float fontSize() {
+        return fontSize;
+    }
+
+    public Color textColor() {
+        return textColor;
+    }
+
+    /** Line height multiple for text contents that don't set their own. */
+    public Float lineSpacing() {
+        return lineSpacing;
+    }
+
     public static final class Builder {
         private Padding padding;
         private BorderStyle borderTop;
@@ -110,6 +157,10 @@ public final class Style {
         private Color backgroundColor;
         private HorizontalAlignment horizontalAlignment;
         private VerticalAlignment verticalAlignment;
+        private PDFont font;
+        private Float fontSize;
+        private Color textColor;
+        private Float lineSpacing;
 
         public Builder padding(Padding padding) {
             this.padding = padding;
@@ -156,6 +207,32 @@ public final class Style {
 
         public Builder verticalAlignment(VerticalAlignment alignment) {
             this.verticalAlignment = alignment;
+            return this;
+        }
+
+        public Builder font(PDFont font) {
+            this.font = font;
+            return this;
+        }
+
+        public Builder fontSize(float fontSize) {
+            if (fontSize <= 0) {
+                throw new IllegalArgumentException("fontSize must be > 0");
+            }
+            this.fontSize = fontSize;
+            return this;
+        }
+
+        public Builder textColor(Color textColor) {
+            this.textColor = textColor;
+            return this;
+        }
+
+        public Builder lineSpacing(float lineSpacing) {
+            if (lineSpacing <= 0) {
+                throw new IllegalArgumentException("lineSpacing must be > 0");
+            }
+            this.lineSpacing = lineSpacing;
             return this;
         }
 
