@@ -52,6 +52,15 @@ public final class PlaceholderContent implements CellContent {
         }
 
         @Override
+        public Split splitAt(float availableHeight) {
+            if (availableHeight <= 1 || rectHeight - availableHeight <= 1) {
+                return null;
+            }
+            return new Split(new PlaceholderElement(rectWidth, availableHeight),
+                    new PlaceholderElement(rectWidth, rectHeight - availableHeight));
+        }
+
+        @Override
         public void draw(RenderContext ctx) throws IOException {
             if (rectWidth <= 0 || rectHeight <= 0) {
                 return;

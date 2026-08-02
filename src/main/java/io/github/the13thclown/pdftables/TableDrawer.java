@@ -129,7 +129,7 @@ public final class TableDrawer {
                 if (headerToDraw != null) {
                     LayoutRenderer.render(document, cs, headerToDraw, 0, headerToDraw.totalHeight(), originX, pageTop);
                 }
-                LayoutRenderer.render(document, cs, current, 0, cut.cutY(), originX, bodyTop, closeBordersAtPageBreak);
+                LayoutRenderer.render(document, cs, cut.pageLayout(), 0, cut.cutY(), originX, bodyTop, closeBordersAtPageBreak);
             }
             if (cut.finished()) {
                 return bodyTop - cut.cutY();

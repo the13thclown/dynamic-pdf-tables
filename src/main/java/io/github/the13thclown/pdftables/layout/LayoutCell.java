@@ -66,6 +66,23 @@ public final class LayoutCell {
     }
 
     /**
+     * A copy for the current page's rendering with item {@code index} replaced
+     * (by the top piece of a split element). Positional state is preserved:
+     * the replacement keeps the original item's top position, and since it is
+     * shorter, its bottom simply moves up to the cut line.
+     */
+    public LayoutCell withItemReplaced(int index, Element replacement) {
+        List<Item> newItems = new ArrayList<>(items);
+        Item original = newItems.get(index);
+        newItems.set(index, new Item(replacement, original.x(), original.y()));
+        LayoutCell copy = new LayoutCell(row, col, rowSpan, colSpan, style, newItems, continuedTop, x, width);
+        copy.virtualTop = virtualTop;
+        copy.height = height;
+        copy.elementTops = elementTops.clone();
+        return copy;
+    }
+
+    /**
      * The continuation of this cell after a page cut at {@code cutY}: keeps only
      * the elements not yet drawn, re-anchors rows relative to {@code firstRemRow},
      * clips the rowspan to the remaining rows, and flags the cell as continued
@@ -76,15 +93,34 @@ public final class LayoutCell {
      * overlaps that weren't in the definition.
      */
     public LayoutCell remainderCopy(int firstRemRow, float cutY) {
+        return remainderCopy(firstRemRow, cutY, null);
+    }
+
+    /**
+     * As {@link #remainderCopy(int, float)}, with {@code splits} mapping item
+     * indexes to the split applied at this cut: the item continues as its
+     * bottom piece, positioned right below where the drawn top piece ended —
+     * no space is lost above the cut.
+     */
+    public LayoutCell remainderCopy(int firstRemRow, float cutY, java.util.Map<Integer, Element.Split> splits) {
         float shift = Math.max(0, cutY - virtualTop);
         List<Item> keep = new ArrayList<>();
         float minPositionedY = Float.MAX_VALUE;
         for (int i = 0; i < items.size(); i++) {
             Item item = items.get(i);
             if (elementTops[i] + item.element().getHeight() > cutY + EPS) {
-                keep.add(item);
-                if (item.positioned()) {
-                    minPositionedY = Math.min(minPositionedY, item.y());
+                Element.Split split = splits == null ? null : splits.get(i);
+                Item kept;
+                if (split != null) {
+                    kept = item.positioned()
+                            ? new Item(split.bottom(), item.x(), item.y() + split.top().getHeight())
+                            : new Item(split.bottom(), null, null);
+                } else {
+                    kept = item;
+                }
+                keep.add(kept);
+                if (kept.positioned()) {
+                    minPositionedY = Math.min(minPositionedY, kept.y());
                 }
             }
         }

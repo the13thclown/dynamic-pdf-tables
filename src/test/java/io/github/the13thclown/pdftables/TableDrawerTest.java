@@ -565,10 +565,58 @@ class TableDrawerTest {
     }
 
     @Test
-    void elementTallerThanAPageThrows() throws IOException {
+    void giantSplittableElementFlowsAcrossPagesInsteadOfThrowing() throws IOException {
+        // a placeholder taller than two pages: splitAt cuts it at every page
+        // boundary, filling each page completely — nothing thrown, no space lost
+        Table table = Table.builder()
+                .addColumnsOfWidth(200, 120)
+                .defaultStyle(bordered())
+                .add(Cell.builder().add(PlaceholderContent.ofHeight(2000)).paddingAll(5).build())
+                .add(Cell.builder().add(PlaceholderContent.ofHeight(30)).paddingAll(5).build())
+                .build();
+        try (PDDocument doc = new PDDocument()) {
+            TableDrawer.builder().document(doc).table(table).build().draw();
+            assertThat(doc.getNumberOfPages()).isEqualTo(3);
+            save(doc, "giant-element-split.pdf");
+        }
+    }
+
+    @Test
+    void giantImageSplitsSeamlesslyAcrossPages() throws IOException {
+        // a 1600pt-tall gradient image: the clip-window split draws each page's
+        // slice so the pieces line up seamlessly across the break
+        Table table = Table.builder()
+                .addColumnsOfWidth(260, 140)
+                .defaultStyle(bordered())
+                .add(Cell.builder().paddingAll(6)
+                        .add(ImageContent.builder(sampleImage(240, 1500, new Color(40, 70, 160), new Color(240, 150, 60)))
+                                .width(240).build())
+                        .build())
+                .add(Cell.of(TextContent.of("A caption beside a picture far taller than a page.")))
+                .build();
+        try (PDDocument doc = new PDDocument()) {
+            TableDrawer.builder().document(doc).table(table).build().draw();
+            assertThat(doc.getNumberOfPages()).isGreaterThanOrEqualTo(3);
+            save(doc, "giant-image-split.pdf");
+        }
+    }
+
+    @Test
+    void unsplittableElementTallerThanAPageStillThrows() throws IOException {
+        CellContent atomic = (availableWidth, style) -> java.util.List.of(
+                new io.github.the13thclown.pdftables.Element() {
+                    @Override
+                    public float getHeight() {
+                        return 2000;
+                    }
+
+                    @Override
+                    public void draw(io.github.the13thclown.pdftables.render.RenderContext ctx) {
+                    }
+                });
         Table table = Table.builder()
                 .addColumnOfWidth(200)
-                .add(Cell.of(PlaceholderContent.ofHeight(2000)))
+                .add(Cell.of(atomic))
                 .build();
         try (PDDocument doc = new PDDocument()) {
             TableDrawer drawer = TableDrawer.builder().document(doc).table(table).build();

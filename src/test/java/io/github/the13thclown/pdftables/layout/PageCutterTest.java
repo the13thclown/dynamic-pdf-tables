@@ -27,6 +27,28 @@ class PageCutterTest {
         return b.build();
     }
 
+    /** Content producing one unsplittable element — for testing atomic pass-down semantics. */
+    private static io.github.the13thclown.pdftables.CellContent atomic(float height) {
+        return (availableWidth, style) -> List.of(new io.github.the13thclown.pdftables.Element() {
+            @Override
+            public float getHeight() {
+                return height;
+            }
+
+            @Override
+            public void draw(io.github.the13thclown.pdftables.render.RenderContext ctx) {
+            }
+        });
+    }
+
+    private static Table atomicColumnRows(float... heights) {
+        Table.Builder b = Table.builder().addColumnOfWidth(200);
+        for (float h : heights) {
+            b.add(Cell.of(atomic(h)));
+        }
+        return b.build();
+    }
+
     @Test
     void layoutFittingCapacityFinishes() {
         VirtualLayout l = layoutOf(singleColumnRows(100, 100));
@@ -39,7 +61,7 @@ class PageCutterTest {
 
     @Test
     void cutInsideARowContinuesItAndPassesItsElementDown() {
-        VirtualLayout l = layoutOf(singleColumnRows(100, 100, 100));
+        VirtualLayout l = layoutOf(atomicColumnRows(100, 100, 100));
         PageCutter.CutResult cut = PageCutter.cut(l, 150);
         assertThat(cut.finished()).isFalse();
         assertThat(cut.cutY()).isEqualTo(150);
@@ -66,10 +88,10 @@ class PageCutterTest {
     void multiElementCellSplitsAtElementGranularity() {
         Table t = Table.builder().addColumnOfWidth(200)
                 .add(Cell.builder()
-                        .add(PlaceholderContent.ofHeight(50))
-                        .add(PlaceholderContent.ofHeight(50))
-                        .add(PlaceholderContent.ofHeight(50))
-                        .add(PlaceholderContent.ofHeight(50))
+                        .add(atomic(50))
+                        .add(atomic(50))
+                        .add(atomic(50))
+                        .add(atomic(50))
                         .build())
                 .build();
         VirtualLayout l = layoutOf(t);
@@ -134,8 +156,8 @@ class PageCutterTest {
     void positionedItemsCrossingTheCutMoveAsOneRigidPiece() {
         Table t = Table.builder().addColumnOfWidth(200)
                 .add(Cell.builder()
-                        .addAt(0, 250, PlaceholderContent.ofSize(50, 100))
-                        .addAt(0, 400, PlaceholderContent.ofSize(50, 50))
+                        .addAt(0, 250, atomic(100))
+                        .addAt(0, 400, atomic(50))
                         .build())
                 .build();
         VirtualLayout l = layoutOf(t);
@@ -147,6 +169,42 @@ class PageCutterTest {
         LayoutCell continued = cut.remainderCells().get(0);
         assertThat(continued.items().get(0).y()).isEqualTo(0);
         assertThat(continued.items().get(1).y()).isEqualTo(150);
+    }
+
+    @Test
+    void splittableElementCrossingTheCutSplitsExactlyThere() {
+        VirtualLayout l = layoutOf(singleColumnRows(500));
+        PageCutter.CutResult cut = PageCutter.cut(l, 200);
+        // the placeholder splits: 200pt top piece drawn on this page...
+        assertThat(cut.drawnElementCount()).isEqualTo(1);
+        LayoutCell pageCell = cut.pageLayout().cells().get(0);
+        assertThat(pageCell.elements().get(0).getHeight()).isCloseTo(200, within(0.01f));
+        // ...and the 300pt bottom piece continues, re-laid from virtual 0
+        LayoutCell continued = cut.remainderCells().get(0);
+        assertThat(continued.elements().get(0).getHeight()).isCloseTo(300, within(0.01f));
+        VirtualLayout next = LayoutEngine.compute(cut.remainderCells(), cut.remainderRowCount(), 0, cut.firstRowContinued());
+        assertThat(next.totalHeight()).isCloseTo(300, within(0.01f));
+
+        // splitting recurses: the bottom piece splits again at the next cut
+        PageCutter.CutResult second = PageCutter.cut(next, 200);
+        assertThat(second.pageLayout().cells().get(0).elements().get(0).getHeight()).isCloseTo(200, within(0.01f));
+        assertThat(second.remainderCells().get(0).elements().get(0).getHeight()).isCloseTo(100, within(0.01f));
+    }
+
+    @Test
+    void splitPositionedItemContinuesRightBelowTheDrawnPiece() {
+        Table t = Table.builder().addColumnOfWidth(200)
+                .add(Cell.builder()
+                        .addAt(10, 50, PlaceholderContent.ofSize(50, 400))
+                        .build())
+                .build();
+        VirtualLayout l = layoutOf(t);
+        PageCutter.CutResult cut = PageCutter.cut(l, 250);
+        // item spans 50..450; 200pt drawn above the cut, bottom piece re-bases
+        // to the top of the next page (y 50 + 200 drawn - 250 shift = 0)
+        LayoutCell continued = cut.remainderCells().get(0);
+        assertThat(continued.items().get(0).element().getHeight()).isCloseTo(200, within(0.01f));
+        assertThat(continued.items().get(0).y()).isCloseTo(0, within(0.01f));
     }
 
     @Test

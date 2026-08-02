@@ -100,7 +100,7 @@ public final class ImageContent implements CellContent {
             w = Math.min(pixelWidth, Math.max(1, availableWidth));
             h = w * aspect;
         }
-        return java.util.List.of(new ImageElement(w, h));
+        return java.util.List.of(new ImageElement(w, h, 0, h));
     }
 
     private synchronized PDImageXObject xObject(PDDocument document) throws IOException {
@@ -114,18 +114,37 @@ public final class ImageContent implements CellContent {
         return cached;
     }
 
+    /**
+     * A window onto the full image: initially the whole picture; page-break
+     * splits narrow the window, and each piece draws the full image clipped to
+     * its box, vertically offset so the pieces line up seamlessly across pages.
+     */
     private final class ImageElement implements Element {
         private final float drawWidth;
-        private final float drawHeight;
+        private final float fullHeight;
+        private final float windowTop;
+        private final float windowHeight;
 
-        private ImageElement(float drawWidth, float drawHeight) {
+        private ImageElement(float drawWidth, float fullHeight, float windowTop, float windowHeight) {
             this.drawWidth = drawWidth;
-            this.drawHeight = drawHeight;
+            this.fullHeight = fullHeight;
+            this.windowTop = windowTop;
+            this.windowHeight = windowHeight;
         }
 
         @Override
         public float getHeight() {
-            return drawHeight;
+            return windowHeight;
+        }
+
+        @Override
+        public Split splitAt(float availableHeight) {
+            if (availableHeight <= 1 || windowHeight - availableHeight <= 1) {
+                return null;
+            }
+            return new Split(
+                    new ImageElement(drawWidth, fullHeight, windowTop, availableHeight),
+                    new ImageElement(drawWidth, fullHeight, windowTop + availableHeight, windowHeight - availableHeight));
         }
 
         @Override
@@ -135,7 +154,19 @@ public final class ImageContent implements CellContent {
                 case CENTER -> ctx.x() + (ctx.width() - drawWidth) / 2;
                 case RIGHT -> ctx.x() + ctx.width() - drawWidth;
             };
-            ctx.stream().drawImage(xObject(ctx.document()), x, ctx.y(), drawWidth, drawHeight);
+            boolean partial = windowTop > 0 || windowHeight < fullHeight;
+            if (partial) {
+                ctx.stream().saveGraphicsState();
+                ctx.stream().addRect(x, ctx.y(), drawWidth, ctx.height());
+                ctx.stream().clip();
+            }
+            // align the window's slice of the image with the box: the image's
+            // top sits windowTop above the box top
+            float imageBottom = ctx.y() + ctx.height() + windowTop - fullHeight;
+            ctx.stream().drawImage(xObject(ctx.document()), x, imageBottom, drawWidth, fullHeight);
+            if (partial) {
+                ctx.stream().restoreGraphicsState();
+            }
         }
     }
 

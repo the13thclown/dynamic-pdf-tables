@@ -101,6 +101,7 @@ untiled example, and `spans.pdf` for a tiled one).
 - Images: `ImageContent.builder(pathOrBytesOrBufferedImage).width(70)` — natural size fits down to the content width, explicit width/height scale proportionally (both = stretch); the document-bound XObject is created lazily and cached per document, so a repeated header logo embeds once
 - Nested tables: `TableContent.of(innerTable)` — inner rows become atomic elements, so nested tables split across pages at inner row boundaries (any depth)
 - Automatic page breaks at element granularity — rows and cells split mid-cell; cut cells draw open by default, or closed on both sides of the break via `TableDrawer.Builder.closeBordersAtPageBreak(true)`
+- Elements can split themselves at the exact cut position via the overridable `Element.splitAt(availableHeight)`: the top piece fills the current page, the bottom continues (recursively) — placeholders and images do this out of the box (images split seamlessly via clip windows), so even content far taller than a page flows instead of throwing; only unsplittable elements that exceed a page raise `TableLayoutException`
 - Repeating header rows on every page (never split)
 - Vertical (90° rotated) text: `VerticalTextContent.of("Q1")` for narrow header columns
 - Multiple multi-page tables on a shared page sequence (side by side): the `pageSupplier` may return existing pages
