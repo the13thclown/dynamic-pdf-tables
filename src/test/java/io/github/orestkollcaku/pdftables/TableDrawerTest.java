@@ -451,6 +451,39 @@ class TableDrawerTest {
     }
 
     @Test
+    void richTextRendersMixedStylesInOneParagraph() throws IOException {
+        org.apache.pdfbox.pdmodel.font.PDType1Font bold =
+                new org.apache.pdfbox.pdmodel.font.PDType1Font(
+                        org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA_BOLD);
+        Table table = Table.builder()
+                .addColumnsOfWidth(300, 160)
+                .defaultStyle(Style.builder().borderAll(BorderStyle.of(0.7f))
+                        .padding(io.github.orestkollcaku.pdftables.style.Padding.of(8)).build())
+                .add(Cell.of(RichTextContent.builder().fontSize(10)
+                        .add("Invoice ")
+                        .add(RichTextContent.fragment("2026-0042").font(bold))
+                        .add(" is payable within ")
+                        .add(RichTextContent.fragment("14 days").font(bold).color(new Color(180, 40, 40)))
+                        .add(". Late payments accrue interest at the statutory rate; this sentence "
+                                + "exists mostly so the paragraph wraps over several lines with the "
+                                + "styled spans flowing naturally inside it.")
+                        .build()))
+                .add(Cell.builder().add(RichTextContent.builder()
+                                .add("Total: ")
+                                .add(RichTextContent.fragment("1.234,56 EUR").font(bold).fontSize(14))
+                                .build())
+                        .horizontalAlignment(HorizontalAlignment.RIGHT)
+                        .verticalAlignment(io.github.orestkollcaku.pdftables.style.VerticalAlignment.MIDDLE)
+                        .build())
+                .build();
+        try (PDDocument doc = new PDDocument()) {
+            TableDrawer.builder().document(doc).table(table).build().draw();
+            assertThat(doc.getNumberOfPages()).isEqualTo(1);
+            save(doc, "rich-text.pdf");
+        }
+    }
+
+    @Test
     void elementTallerThanAPageThrows() throws IOException {
         Table table = Table.builder()
                 .addColumnOfWidth(200)
