@@ -6,6 +6,7 @@ import io.github.orestkollcaku.pdftables.layout.VirtualLayout;
 import io.github.orestkollcaku.pdftables.style.BorderStyle;
 import io.github.orestkollcaku.pdftables.style.HorizontalAlignment;
 import io.github.orestkollcaku.pdftables.style.Style;
+import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 
 import java.io.IOException;
@@ -36,18 +37,18 @@ public final class LayoutRenderer {
     private LayoutRenderer() {
     }
 
-    public static void render(PDPageContentStream cs, VirtualLayout layout,
+    public static void render(PDDocument document, PDPageContentStream cs, VirtualLayout layout,
                               float fromY, float toY, float originX, float topY) throws IOException {
-        render(cs, layout, fromY, toY, originX, topY, false);
+        render(document, cs, layout, fromY, toY, originX, topY, false);
     }
 
     /**
-     * As {@link #render(PDPageContentStream, VirtualLayout, float, float, float, float)},
+     * As {@link #render(PDDocument, PDPageContentStream, VirtualLayout, float, float, float, float)},
      * but with {@code closeCutBorders} a cell cut by the window's bottom edge
      * draws its bottom border along the cut line, and a continued cell draws
      * its top border — cut boxes look closed on every page instead of open.
      */
-    public static void render(PDPageContentStream cs, VirtualLayout layout,
+    public static void render(PDDocument document, PDPageContentStream cs, VirtualLayout layout,
                               float fromY, float toY, float originX, float topY,
                               boolean closeCutBorders) throws IOException {
         for (LayoutCell c : layout.cells()) {
@@ -81,10 +82,10 @@ public final class LayoutRenderer {
                 if (item.positioned()) {
                     // positioned items sit exactly at their offset; cell alignment
                     // must not re-position them within the leftover width
-                    e.draw(new RenderContext(cs, contentX + item.x(), topY - bottom,
+                    e.draw(new RenderContext(document, cs, contentX + item.x(), topY - bottom,
                             Math.max(0, contentWidth - item.x()), e.getHeight(), LEFT_ALIGNED.mergedOnto(s)));
                 } else {
-                    e.draw(new RenderContext(cs, contentX, topY - bottom, contentWidth, e.getHeight(), s));
+                    e.draw(new RenderContext(document, cs, contentX, topY - bottom, contentWidth, e.getHeight(), s));
                 }
             }
         }

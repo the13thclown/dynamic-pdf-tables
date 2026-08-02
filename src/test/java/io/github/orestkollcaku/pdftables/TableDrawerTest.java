@@ -409,6 +409,48 @@ class TableDrawerTest {
     }
 
     @Test
+    void imageTableRendersWithRepeatedHeaderLogoAcrossPages() throws IOException {
+        ImageContent logo = ImageContent.builder(sampleImage(120, 40, new Color(52, 74, 120), new Color(120, 160, 220)))
+                .height(16).build();
+        Table.Builder b = Table.builder()
+                .addColumnsOfWidth(140, 180, 180)
+                .defaultStyle(Style.builder().borderAll(BorderStyle.of(0.7f))
+                        .padding(io.github.orestkollcaku.pdftables.style.Padding.of(6)).build())
+                .headerRowCount(1)
+                .add(Cell.builder().add(logo).build())
+                .add(headerCell("Picture"))
+                .add(headerCell("Caption"));
+        for (int i = 1; i <= 18; i++) {
+            b.add(Cell.builder().add(TextContent.of("Row " + i)).build());
+            b.add(Cell.builder()
+                    .add(ImageContent.builder(sampleImage(90, 60,
+                            new Color(40 + i * 10, 80, 200 - i * 8), new Color(230, 240, 250)))
+                            .width(70).build())
+                    .horizontalAlignment(HorizontalAlignment.CENTER)
+                    .build());
+            b.add(Cell.of(TextContent.builder("A caption describing picture number " + i
+                    + " in a couple of wrapped lines of text.").fontSize(9).build()));
+        }
+        try (PDDocument doc = new PDDocument()) {
+            TableDrawer.builder().document(doc).table(b.build()).build().draw();
+            assertThat(doc.getNumberOfPages()).isGreaterThanOrEqualTo(2);
+            save(doc, "image-table.pdf");
+        }
+    }
+
+    private static java.awt.image.BufferedImage sampleImage(int w, int h, Color from, Color to) {
+        java.awt.image.BufferedImage img =
+                new java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.awt.Graphics2D g = img.createGraphics();
+        g.setPaint(new java.awt.GradientPaint(0, 0, from, w, h, to));
+        g.fillRect(0, 0, w, h);
+        g.setColor(Color.WHITE);
+        g.fillOval(w / 4, h / 4, w / 2, h / 2);
+        g.dispose();
+        return img;
+    }
+
+    @Test
     void elementTallerThanAPageThrows() throws IOException {
         Table table = Table.builder()
                 .addColumnOfWidth(200)

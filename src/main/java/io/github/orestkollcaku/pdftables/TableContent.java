@@ -88,7 +88,7 @@ public final class TableContent implements CellContent {
             // map inner virtual 0 to the page y it would have if the whole
             // inner table were drawn contiguously from this block's box top
             float innerTopPageY = ctx.y() + ctx.height() + blockTop;
-            LayoutRenderer.render(ctx.stream(), inner, blockTop, blockTop + blockHeight,
+            LayoutRenderer.render(ctx.document(), ctx.stream(), inner, blockTop, blockTop + blockHeight,
                     ctx.x(), innerTopPageY);
         }
     }

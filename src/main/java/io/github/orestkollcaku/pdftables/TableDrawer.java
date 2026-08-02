@@ -115,9 +115,9 @@ public final class TableDrawer {
             try (PDPageContentStream cs = new PDPageContentStream(
                     document, page, PDPageContentStream.AppendMode.APPEND, true, true)) {
                 if (headerToDraw != null) {
-                    LayoutRenderer.render(cs, headerToDraw, 0, headerToDraw.totalHeight(), startX, pageTop);
+                    LayoutRenderer.render(document, cs, headerToDraw, 0, headerToDraw.totalHeight(), startX, pageTop);
                 }
-                LayoutRenderer.render(cs, current, 0, cut.cutY(), startX, bodyTop, closeBordersAtPageBreak);
+                LayoutRenderer.render(document, cs, current, 0, cut.cutY(), startX, bodyTop, closeBordersAtPageBreak);
             }
             if (cut.finished()) {
                 return bodyTop - cut.cutY();

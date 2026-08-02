@@ -23,9 +23,10 @@ cut by a page break is drawn with an open bottom edge and continues on the next 
 top. Only a single element taller than a page is an error.
 
 Content types: `TextContent` (wrapped text — one element per line, so text paginates line by line),
+`ImageContent` (from a file, bytes or `BufferedImage`; scales to fit or to explicit dimensions),
 `TableContent` (nested tables), and `PlaceholderContent` (a rectangle showing occupied space, useful
-for prototyping layouts). Images and further types plug in as new `CellContent` implementations
-without touching the engine.
+for prototyping layouts). Further types plug in as new `CellContent` implementations without
+touching the engine.
 
 ## Usage
 
@@ -71,6 +72,7 @@ try (PDDocument doc = new PDDocument()) {
 - `colSpan` / `rowSpan` with automatic grid flow; configurable rowspan height distribution (`EQUAL` / `LAST_ROW`)
 - Arbitrary content placement inside a cell: `Cell.Builder.addAt(x, y, content)` — offsets from the content box, overlaps allowed, arrangement preserved across page breaks
 - Text: `TextContent.builder("...").font(F).fontSize(10).color(c).lineSpacing(1.3f)` — wraps at the content width (spaces, `\n`, mid-word for overlong words), aligns per cell style, splits across pages line by line; unencodable characters become `?`
+- Images: `ImageContent.builder(pathOrBytesOrBufferedImage).width(70)` — natural size fits down to the content width, explicit width/height scale proportionally (both = stretch); the document-bound XObject is created lazily and cached per document, so a repeated header logo embeds once
 - Nested tables: `TableContent.of(innerTable)` — inner rows become atomic elements, so nested tables split across pages at inner row boundaries (any depth)
 - Automatic page breaks at element granularity — rows and cells split mid-cell; cut cells draw open by default, or closed on both sides of the break via `TableDrawer.Builder.closeBordersAtPageBreak(true)`
 - Repeating header rows on every page (never split)
