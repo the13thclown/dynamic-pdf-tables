@@ -68,6 +68,25 @@ try (PDDocument doc = new PDDocument()) {
 }
 ```
 
+### Spans must tile
+
+Cells auto-flow forward: each cell takes the next free slot, and the cursor never goes back to
+fill earlier gaps (same semantics as HTML table auto-layout). For a clean, gap-free grid, treat
+`colSpan`/`rowSpan` cells like Tetris pieces — they must tile:
+
+1. **Counts**: the slots your cells cover between two row boundaries should sum to a multiple of
+   the column count. If a group of cells covers 17 slots in a 4-column table, every repetition
+   ends mid-row and shifts the next group sideways.
+2. **Geometry**: a `colSpan(n)` needs *n consecutive* free columns in some row. If the free slots
+   in the current rows are split around an occupied column, the spanning cell wraps forward to a
+   fresh row and the skipped slots stay empty forever (rendered as nothing — no border, no
+   background).
+
+A definition that violates these rules still renders — pagination, borders and continuations all
+behave — but the output shows the mismatch: uncovered gaps and staggered groups. That is the
+definition's shape, faithfully drawn (see `spans-stress.pdf` in the test output for a deliberately
+untiled example, and `spans.pdf` for a tiled one).
+
 ## Features (v1)
 
 - Fixed and relative column widths
