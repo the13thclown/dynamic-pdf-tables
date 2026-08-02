@@ -1,6 +1,5 @@
 package io.github.the13thclown.pdftables;
 
-import io.github.the13thclown.pdftables.layout.Element;
 import io.github.the13thclown.pdftables.render.RenderContext;
 import io.github.the13thclown.pdftables.style.Style;
 import org.apache.pdfbox.pdmodel.font.PDFont;

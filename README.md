@@ -23,10 +23,15 @@ cut by a page break is drawn with an open bottom edge and continues on the next 
 top. Only a single element taller than a page is an error.
 
 Content types: `TextContent` (wrapped text — one element per line, so text paginates line by line),
-`ImageContent` (from a file, bytes or `BufferedImage`; scales to fit or to explicit dimensions),
-`TableContent` (nested tables), and `PlaceholderContent` (a rectangle showing occupied space, useful
-for prototyping layouts). Further types plug in as new `CellContent` implementations without
-touching the engine.
+`RichTextContent` (mixed-style fragments), `VerticalTextContent` (90° rotated), `ImageContent`
+(from a file, bytes or `BufferedImage`; scales to fit or to explicit dimensions), `TableContent`
+(nested tables), and `PlaceholderContent` (a rectangle showing occupied space, useful for
+prototyping layouts).
+
+**Extending:** implement `CellContent.layout(availableWidth, style) → List<Element>` — measurement
+and drawing only; pagination, spanning, nesting and the style cascade come free. The full contract
+is three types (`CellContent`, `Element`, `RenderContext`); the `layout` package is internal. See
+`CustomContentTest` for a complete custom bar-chart content in ~50 lines.
 
 ## Usage
 

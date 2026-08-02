@@ -1,4 +1,4 @@
-package io.github.the13thclown.pdftables.layout;
+package io.github.the13thclown.pdftables;
 
 import io.github.the13thclown.pdftables.render.RenderContext;
 

@@ -1,5 +1,6 @@
 package io.github.the13thclown.pdftables.layout;
 
+import io.github.the13thclown.pdftables.Element;
 import io.github.the13thclown.pdftables.style.Style;
 import io.github.the13thclown.pdftables.style.VerticalAlignment;
 

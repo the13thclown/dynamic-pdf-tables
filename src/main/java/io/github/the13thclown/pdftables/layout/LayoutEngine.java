@@ -1,6 +1,8 @@
 package io.github.the13thclown.pdftables.layout;
 
 import io.github.the13thclown.pdftables.Cell;
+import io.github.the13thclown.pdftables.ColumnSpec;
+import io.github.the13thclown.pdftables.Element;
 import io.github.the13thclown.pdftables.RowSpanDistribution;
 import io.github.the13thclown.pdftables.Table;
 import io.github.the13thclown.pdftables.TableValidationException;

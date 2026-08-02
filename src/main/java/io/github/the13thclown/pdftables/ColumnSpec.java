@@ -1,4 +1,4 @@
-package io.github.the13thclown.pdftables.layout;
+package io.github.the13thclown.pdftables;
 
 /**
  * A column definition: either a fixed width in points, or a relative weight

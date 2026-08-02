@@ -1,6 +1,5 @@
 package io.github.the13thclown.pdftables;
 
-import io.github.the13thclown.pdftables.layout.Element;
 import io.github.the13thclown.pdftables.render.RenderContext;
 
 import java.awt.Color;

@@ -1,6 +1,6 @@
 package io.github.the13thclown.pdftables.render;
 
-import io.github.the13thclown.pdftables.layout.Element;
+import io.github.the13thclown.pdftables.Element;
 import io.github.the13thclown.pdftables.layout.LayoutCell;
 import io.github.the13thclown.pdftables.layout.VirtualLayout;
 import io.github.the13thclown.pdftables.style.BorderStyle;
