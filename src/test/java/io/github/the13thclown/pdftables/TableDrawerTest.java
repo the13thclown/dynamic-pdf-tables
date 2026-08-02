@@ -639,7 +639,7 @@ class TableDrawerTest {
         Color accent = new Color(180, 60, 45);
 
         Table.Builder b = Table.builder()
-                .addColumnsOfWidth(40, 190, 135, 150)
+                .addColumnsOfWidth(40, 160, 135, 180)
                 .defaultStyle(Style.builder()
                         .borderAll(BorderStyle.of(0.6f, new Color(120, 128, 145)))
                         .padding(io.github.the13thclown.pdftables.style.Padding.of(7))
@@ -706,8 +706,8 @@ class TableDrawerTest {
                         .addColumnOfRelativeWidth(2).addColumnOfRelativeWidth(1)
                         .defaultStyle(Style.builder()
                                 .borderAll(BorderStyle.of(0.4f, new Color(170, 175, 190)))
-                                .padding(io.github.the13thclown.pdftables.style.Padding.of(4))
-                                .fontSize(9).build())
+                                .padding(io.github.the13thclown.pdftables.style.Padding.of(6))
+                                .fontSize(10).build())
                         .add(Cell.of(TextContent.of("Units")))
                         .add(Cell.builder().add(TextContent.of(String.valueOf(120 + product * 37)))
                                 .horizontalAlignment(HorizontalAlignment.RIGHT).build())
