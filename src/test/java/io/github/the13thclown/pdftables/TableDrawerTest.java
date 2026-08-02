@@ -631,6 +631,116 @@ class TableDrawerTest {
     }
 
     @Test
+    void showcaseDocumentExercisesTheWholeFeatureSet() throws IOException {
+        org.apache.pdfbox.pdmodel.font.PDType1Font bold =
+                new org.apache.pdfbox.pdmodel.font.PDType1Font(
+                        org.apache.pdfbox.pdmodel.font.Standard14Fonts.FontName.HELVETICA_BOLD);
+        Color night = new Color(38, 54, 89);
+        Color accent = new Color(180, 60, 45);
+
+        Table.Builder b = Table.builder()
+                .addColumnsOfWidth(34, 166, 120, 180)
+                .defaultStyle(Style.builder()
+                        .borderAll(BorderStyle.of(0.6f, new Color(120, 128, 145)))
+                        .padding(io.github.the13thclown.pdftables.style.Padding.of(6))
+                        .fontSize(9)                              // table-wide text default
+                        .build())
+                .headerRowCount(1)
+                .rowStyler(row -> row >= 2 && row % 2 == 0
+                        ? Style.builder().backgroundColor(new Color(242, 244, 249)).build()
+                        : null)
+                .columnStyler(col -> col == 3
+                        ? Style.builder().backgroundColor(new Color(248, 246, 238)).build()
+                        : null);
+
+        // repeating header: logo + bold white title on a dark band
+        b.add(Cell.builder().colSpan(4)
+                .backgroundColor(night)
+                .add(ImageContent.builder(sampleImage(120, 30, accent, night)).height(14).build())
+                .add(TextContent.builder("QUARTERLY PRODUCT REPORT").font(bold).fontSize(13)
+                        .color(Color.WHITE).build())
+                .horizontalAlignment(HorizontalAlignment.CENTER)
+                .build());
+
+        // intro: justified rich text across the full width
+        b.add(Cell.builder().colSpan(4)
+                .horizontalAlignment(HorizontalAlignment.JUSTIFY)
+                .add(RichTextContent.builder()
+                        .add("This document is produced by a single test of ")
+                        .add(RichTextContent.fragment("dynamic-pdf-tables").font(bold))
+                        .add(" and exercises the whole feature set at once: a repeating image header, "
+                                + "justified rich text, vertical category labels spanning rows, nested "
+                                + "stat tables, images, zebra striping via the row styler, a tinted "
+                                + "column via the column styler, and page breaks cutting through "
+                                + "whatever happens to be at the page boundary — cells continue "
+                                + "with open borders and finish on the next page.")
+                        .build())
+                .build());
+
+        String[] categories = {"ALPHA", "BETA", "GAMMA"};
+        int product = 0;
+        for (String category : categories) {
+            for (int i = 0; i < 4; i++) {
+                product++;
+                if (i == 0) {
+                    b.add(Cell.builder().rowSpan(4)
+                            .add(VerticalTextContent.builder(category).font(bold).build())
+                            .horizontalAlignment(HorizontalAlignment.CENTER)
+                            .verticalAlignment(io.github.the13thclown.pdftables.style.VerticalAlignment.MIDDLE)
+                            .backgroundColor(new Color(230, 233, 240))
+                            .build());
+                }
+                b.add(Cell.of(RichTextContent.builder()
+                        .add(RichTextContent.fragment("Product " + product + "\n").font(bold).fontSize(10))
+                        .add(RichTextContent.fragment("A short description that wraps over a couple "
+                                + "of lines and inherits the table-wide 9pt default.")
+                                .color(new Color(90, 90, 90)))
+                        .build()));
+                b.add(Cell.builder()
+                        .add(ImageContent.builder(sampleImage(90, 54,
+                                new Color(40 + product * 12, 90, 190 - product * 9),
+                                new Color(235, 240, 248))).width(88).build())
+                        .horizontalAlignment(HorizontalAlignment.CENTER)
+                        .build());
+                Table stats = Table.builder()
+                        .addColumnOfRelativeWidth(2).addColumnOfRelativeWidth(1)
+                        .defaultStyle(Style.builder()
+                                .borderAll(BorderStyle.of(0.4f, new Color(170, 175, 190)))
+                                .padding(io.github.the13thclown.pdftables.style.Padding.of(3))
+                                .fontSize(8).build())
+                        .add(Cell.of(TextContent.of("Units")))
+                        .add(Cell.builder().add(TextContent.of(String.valueOf(120 + product * 37)))
+                                .horizontalAlignment(HorizontalAlignment.RIGHT).build())
+                        .add(Cell.of(TextContent.of("Revenue")))
+                        .add(Cell.builder().add(TextContent.of((2 + product) + "." + (product * 7 % 100) + "k"))
+                                .horizontalAlignment(HorizontalAlignment.RIGHT).build())
+                        .add(Cell.of(TextContent.of("Trend")))
+                        .add(Cell.builder().add(TextContent.builder(product % 3 == 0 ? "-" : "+").font(bold)
+                                        .color(product % 3 == 0 ? accent : new Color(40, 120, 60)).build())
+                                .horizontalAlignment(HorizontalAlignment.RIGHT).build())
+                        .build();
+                b.add(Cell.of(TableContent.of(stats)));
+            }
+        }
+
+        // totals row: right-aligned mixed-size rich text
+        b.add(Cell.builder().colSpan(4)
+                .horizontalAlignment(HorizontalAlignment.RIGHT)
+                .backgroundColor(new Color(230, 233, 240))
+                .add(RichTextContent.builder()
+                        .add("Grand total: ")
+                        .add(RichTextContent.fragment("187.4k EUR").font(bold).fontSize(12))
+                        .build())
+                .build());
+
+        try (PDDocument doc = new PDDocument()) {
+            TableDrawer.builder().document(doc).table(b.build()).build().draw();
+            assertThat(doc.getNumberOfPages()).isGreaterThanOrEqualTo(2);
+            save(doc, "showcase.pdf");
+        }
+    }
+
+    @Test
     void unsplittableElementTallerThanAPageStillThrows() throws IOException {
         CellContent atomic = (availableWidth, style) -> java.util.List.of(
                 new io.github.the13thclown.pdftables.Element() {
