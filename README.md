@@ -2,6 +2,20 @@
 
 A dynamic table building library on top of [Apache PDFBox](https://pdfbox.apache.org/) 3.x.
 
+## Installation
+
+Releases are published to Maven Central:
+
+```xml
+<dependency>
+    <groupId>io.github.the13thclown</groupId>
+    <artifactId>dynamic-pdf-tables</artifactId>
+    <version>0.2.0</version>
+</dependency>
+```
+
+Requires Java 17+. PDFBox 3.x is the only runtime dependency.
+
 ## Core ideas
 
 **Definition time and render time are strictly separated.** Builders capture structure only — no

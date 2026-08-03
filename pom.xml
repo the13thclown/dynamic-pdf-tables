@@ -11,6 +11,7 @@
 
     <name>dynamic-pdf-tables</name>
     <description>Dynamic table building library on top of Apache PDFBox</description>
+    <url>https://github.com/the13thclown/dynamic-pdf-tables</url>
 
     <licenses>
         <license>
@@ -18,6 +19,21 @@
             <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
         </license>
     </licenses>
+
+    <developers>
+        <developer>
+            <id>the13thclown</id>
+            <name>the13thclown</name>
+            <url>https://github.com/the13thclown</url>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/the13thclown/dynamic-pdf-tables.git</connection>
+        <developerConnection>scm:git:git@github.com:the13thclown/dynamic-pdf-tables.git</developerConnection>
+        <url>https://github.com/the13thclown/dynamic-pdf-tables</url>
+        <tag>HEAD</tag>
+    </scm>
 
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
@@ -73,4 +89,72 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.3.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.11.2</version>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.7</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <!-- Prompting for the passphrase is impossible in CI; read it from
+                                 the MAVEN_GPG_PASSPHRASE environment variable instead. -->
+                            <bestPractices>true</bestPractices>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.8.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <!-- Stop in the VALIDATED state: the deployment waits in
+                                 central.sonatype.com/publishing for a manual "Publish" click. -->
+                            <autoPublish>false</autoPublish>
+                            <waitUntil>validated</waitUntil>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>
