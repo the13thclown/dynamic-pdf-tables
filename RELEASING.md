@@ -70,6 +70,26 @@ $env:MAVEN_GPG_PASSPHRASE = "..."
 
    Bump `pom.xml` to the next `-SNAPSHOT` version and commit (`Start X.Y+1.0-SNAPSHOT`).
 
+## After the first release: PDFBox FAQ listing
+
+The Apache PDFBox FAQ answers "Can I use PDFBox to create complex layouts?" with a
+list of table/layout libraries built on PDFBox — the main discovery channel for this
+niche. Once 0.2.0 is public on Maven Central, submit a PR to the docs mirror:
+
+1. Fork https://github.com/apache/pdfbox-docs and edit `content/3.0/faq.md`
+   (3.0 only — this library requires PDFBox 3.x).
+2. In the list under "But PDFBox is the foundation of some projects which might
+   help", the entries are alphabetical; insert after BoxTable:
+
+   ```markdown
+   - [dynamic-pdf-tables](https://github.com/the13thclown/dynamic-pdf-tables)
+   ```
+
+3. Open the PR with a short note: dynamic table building on PDFBox 3.x with
+   element-granular pagination (cells split across pages), nested tables,
+   repeating headers and Apache-2.0 licensing; released on Maven Central as
+   `io.github.the13thclown:dynamic-pdf-tables`.
+
 ## Local dry run
 
 Everything except the upload can be verified without credentials or a GPG key:
