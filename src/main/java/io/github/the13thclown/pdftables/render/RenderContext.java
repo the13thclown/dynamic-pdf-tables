@@ -11,6 +11,15 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
  * in final PDF coordinates ({@code x},{@code y} = lower-left corner), the
  * cell's fully resolved style (no null fields except backgroundColor), and the
  * page the box landed on.
+ *
+ * @param document the document being drawn into
+ * @param stream   the open content stream to draw with
+ * @param x        the box's left edge in PDF coordinates
+ * @param y        the box's bottom edge in PDF coordinates
+ * @param width    the box width in points
+ * @param height   the box height in points
+ * @param style    the cell's fully resolved style
+ * @param pageRef  the page the box landed on
  */
 public record RenderContext(
         PDDocument document,
@@ -22,12 +31,12 @@ public record RenderContext(
         Style style,
         PageRef pageRef) {
 
-    /** The page this box is being drawn on. */
+    /** {@return the page this box is being drawn on} */
     public PDPage page() {
         return pageRef.page();
     }
 
-    /** Zero-based position of {@link #page()} in the document. */
+    /** {@return the zero-based position of {@link #page()} in the document} */
     public int pageIndex() {
         return pageRef.pageIndex();
     }
@@ -37,6 +46,8 @@ public record RenderContext(
      * content that depends on pagination it cannot see yet ("continued on page
      * 5"). The callback gets a context with this same page, box and style, and
      * a fresh content stream appended to the page.
+     *
+     * @param draw the drawing operation to run once pagination is settled
      */
     public void defer(DeferredDraw draw) {
         pageRef.deferrals().add(pageRef, x, y, width, height, style, draw);

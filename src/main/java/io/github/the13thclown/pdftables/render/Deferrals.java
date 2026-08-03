@@ -28,6 +28,16 @@ public final class Deferrals {
 
     private final List<Entry> entries = new ArrayList<>();
 
+    /** Creates an empty registry; one per {@code TableDrawer.draw} call. */
+    public Deferrals() {
+    }
+
+    /**
+     * {@return a page identity handing deferred draws back to this registry}
+     *
+     * @param page      the page
+     * @param pageIndex the page's zero-based position in the document
+     */
     public PageRef pageRef(PDPage page, int pageIndex) {
         return new PageRef(page, pageIndex, this);
     }
@@ -36,6 +46,7 @@ public final class Deferrals {
         entries.add(new Entry(ref, x, y, width, height, style, draw));
     }
 
+    /** {@return whether no deferred draws are pending} */
     public boolean isEmpty() {
         return entries.isEmpty();
     }
@@ -43,6 +54,9 @@ public final class Deferrals {
     /**
      * Runs every registered draw, one appended content stream per page, in the
      * order the pages were first deferred to.
+     *
+     * @param document the document the pages belong to
+     * @throws IOException on content stream errors
      */
     public void runAll(PDDocument document) throws IOException {
         for (int round = 0; !entries.isEmpty(); round++) {

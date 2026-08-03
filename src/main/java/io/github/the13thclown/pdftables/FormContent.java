@@ -35,10 +35,21 @@ public final class FormContent implements CellContent {
         this.height = b.height;
     }
 
+    /**
+     * Shorthand for a form drawn at its natural bounding box size.
+     *
+     * @param form the form XObject, already embedded in the target document
+     * @return the content
+     */
     public static FormContent of(PDFormXObject form) {
         return builder(form).build();
     }
 
+    /**
+     * {@return a new builder}
+     *
+     * @param form the form XObject, already embedded in the target document
+     */
     public static Builder builder(PDFormXObject form) {
         return new Builder(form);
     }
@@ -101,6 +112,7 @@ public final class FormContent implements CellContent {
         }
     }
 
+    /** Builds a {@link FormContent}. Obtained from {@link FormContent#builder}. */
     public static final class Builder {
         private final PDFormXObject form;
         private Float width;
@@ -114,7 +126,12 @@ public final class FormContent implements CellContent {
             }
         }
 
-        /** Rendered width in points; height follows the bounding box ratio unless also set. */
+        /**
+         * Rendered width in points; height follows the bounding box ratio unless also set.
+         *
+         * @param width the width in points
+         * @return this builder
+         */
         public Builder width(float width) {
             if (width <= 0) {
                 throw new IllegalArgumentException("width must be > 0");
@@ -123,7 +140,12 @@ public final class FormContent implements CellContent {
             return this;
         }
 
-        /** Rendered height in points; width follows the bounding box ratio unless also set. */
+        /**
+         * Rendered height in points; width follows the bounding box ratio unless also set.
+         *
+         * @param height the height in points
+         * @return this builder
+         */
         public Builder height(float height) {
             if (height <= 0) {
                 throw new IllegalArgumentException("height must be > 0");
@@ -132,6 +154,7 @@ public final class FormContent implements CellContent {
             return this;
         }
 
+        /** {@return the finished content} */
         public FormContent build() {
             return new FormContent(this);
         }

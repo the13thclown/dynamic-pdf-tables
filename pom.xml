@@ -112,6 +112,11 @@
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
                         <version>3.11.2</version>
+                        <configuration>
+                            <!-- The layout package is internal (see its package-info);
+                                 the published javadoc shows the public contract only. -->
+                            <excludePackageNames>io.github.the13thclown.pdftables.layout</excludePackageNames>
+                        </configuration>
                         <executions>
                             <execution>
                                 <id>attach-javadocs</id>

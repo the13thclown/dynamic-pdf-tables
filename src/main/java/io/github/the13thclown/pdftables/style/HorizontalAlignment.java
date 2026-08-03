@@ -7,5 +7,12 @@ package io.github.the13thclown.pdftables.style;
  * as {@code LEFT}.
  */
 public enum HorizontalAlignment {
-    LEFT, CENTER, RIGHT, JUSTIFY
+    /** Content sits against the left edge of its box. */
+    LEFT,
+    /** Content is centered within its box. */
+    CENTER,
+    /** Content sits against the right edge of its box. */
+    RIGHT,
+    /** Wrapped text lines stretch to the full width; non-text content aligns left. */
+    JUSTIFY
 }

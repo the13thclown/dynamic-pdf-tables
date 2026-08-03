@@ -21,6 +21,10 @@ public interface CellContent {
      * Lays this content out for the given available width and returns its
      * elements, top to bottom. {@code style} is the cell's resolved style —
      * every field non-null except backgroundColor.
+     *
+     * @param availableWidth the cell's content width in points (width minus padding)
+     * @param style          the cell's fully resolved style
+     * @return the content's elements, top to bottom
      */
     List<Element> layout(float availableWidth, Style style);
 }

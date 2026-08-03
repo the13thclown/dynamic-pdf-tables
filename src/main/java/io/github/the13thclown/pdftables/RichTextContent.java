@@ -47,24 +47,49 @@ public final class RichTextContent implements CellContent {
             this.color = color;
         }
 
+        /**
+         * {@return a fragment in the content's base style}
+         *
+         * @param text the fragment's text
+         */
         public static Fragment of(String text) {
             return new Fragment(text, null, null, null);
         }
 
+        /**
+         * {@return a copy of this fragment with its own font}
+         *
+         * @param font the fragment's font
+         */
         public Fragment font(PDFont font) {
             return new Fragment(text, font, fontSize, color);
         }
 
+        /**
+         * {@return a copy of this fragment with its own font size}
+         *
+         * @param size the font size in points
+         */
         public Fragment fontSize(float size) {
             return new Fragment(text, font, size, color);
         }
 
+        /**
+         * {@return a copy of this fragment with its own text color}
+         *
+         * @param color the text color
+         */
         public Fragment color(Color color) {
             return new Fragment(text, font, fontSize, color);
         }
     }
 
-    /** Shorthand for {@link Fragment#of}. */
+    /**
+     * Shorthand for {@link Fragment#of}.
+     *
+     * @param text the fragment's text
+     * @return a fragment in the content's base style
+     */
     public static Fragment fragment(String text) {
         return Fragment.of(text);
     }
@@ -83,6 +108,7 @@ public final class RichTextContent implements CellContent {
         this.lineSpacing = b.lineSpacing;
     }
 
+    /** {@return a new builder} */
     public static Builder builder() {
         return new Builder();
     }
@@ -300,6 +326,7 @@ public final class RichTextContent implements CellContent {
         }
     }
 
+    /** Builds a {@link RichTextContent}. Obtained from {@link RichTextContent#builder()}. */
     public static final class Builder {
         private final List<Fragment> fragments = new ArrayList<>();
         private PDFont font;
@@ -307,12 +334,26 @@ public final class RichTextContent implements CellContent {
         private Color color;
         private Float lineSpacing;
 
-        /** Base font for fragments that don't set their own; defaults to the cell style. */
+        private Builder() {
+        }
+
+        /**
+         * Base font for fragments that don't set their own; defaults to the cell style.
+         *
+         * @param font the base font
+         * @return this builder
+         */
         public Builder font(PDFont font) {
             this.font = Objects.requireNonNull(font, "font");
             return this;
         }
 
+        /**
+         * Base font size for fragments that don't set their own; defaults to the cell style.
+         *
+         * @param fontSize the base font size in points
+         * @return this builder
+         */
         public Builder fontSize(float fontSize) {
             if (fontSize <= 0) {
                 throw new IllegalArgumentException("fontSize must be > 0");
@@ -321,12 +362,23 @@ public final class RichTextContent implements CellContent {
             return this;
         }
 
+        /**
+         * Base text color for fragments that don't set their own; defaults to the cell style.
+         *
+         * @param color the base text color
+         * @return this builder
+         */
         public Builder color(Color color) {
             this.color = Objects.requireNonNull(color, "color");
             return this;
         }
 
-        /** Line height as a multiple of the tallest font size on each line. */
+        /**
+         * Line height as a multiple of the tallest font size on each line.
+         *
+         * @param lineSpacing the line height multiple
+         * @return this builder
+         */
         public Builder lineSpacing(float lineSpacing) {
             if (lineSpacing <= 0) {
                 throw new IllegalArgumentException("lineSpacing must be > 0");
@@ -335,17 +387,29 @@ public final class RichTextContent implements CellContent {
             return this;
         }
 
-        /** Adds a fragment in the base style. */
+        /**
+         * Adds a fragment in the base style.
+         *
+         * @param text the fragment's text
+         * @return this builder
+         */
         public Builder add(String text) {
             fragments.add(Fragment.of(text));
             return this;
         }
 
+        /**
+         * Adds a styled fragment.
+         *
+         * @param fragment the fragment
+         * @return this builder
+         */
         public Builder add(Fragment fragment) {
             fragments.add(Objects.requireNonNull(fragment, "fragment"));
             return this;
         }
 
+        /** {@return the finished content} */
         public RichTextContent build() {
             return new RichTextContent(this);
         }

@@ -37,6 +37,20 @@ public final class LayoutRenderer {
     private LayoutRenderer() {
     }
 
+    /**
+     * Draws the window {@code [fromY, toY)} of {@code layout} with open borders
+     * at cuts (see the class comment for the coordinate mapping).
+     *
+     * @param document the document being drawn into
+     * @param cs       the open content stream to draw with
+     * @param pageRef  the page the window is drawn on
+     * @param layout   the virtual layout to draw a window of
+     * @param fromY    the window's top in virtual y (inclusive)
+     * @param toY      the window's bottom in virtual y (exclusive)
+     * @param originX  the page x of the layout's left edge
+     * @param topY     the page y of virtual 0
+     * @throws IOException on content stream errors
+     */
     public static void render(PDDocument document, PDPageContentStream cs, PageRef pageRef, VirtualLayout layout,
                               float fromY, float toY, float originX, float topY) throws IOException {
         render(document, cs, pageRef, layout, fromY, toY, originX, topY, false);
@@ -47,6 +61,17 @@ public final class LayoutRenderer {
      * but with {@code closeCutBorders} a cell cut by the window's bottom edge
      * draws its bottom border along the cut line, and a continued cell draws
      * its top border — cut boxes look closed on every page instead of open.
+     *
+     * @param document        the document being drawn into
+     * @param cs              the open content stream to draw with
+     * @param pageRef         the page the window is drawn on
+     * @param layout          the virtual layout to draw a window of
+     * @param fromY           the window's top in virtual y (inclusive)
+     * @param toY             the window's bottom in virtual y (exclusive)
+     * @param originX         the page x of the layout's left edge
+     * @param topY            the page y of virtual 0
+     * @param closeCutBorders whether cut cell boxes draw closed instead of open
+     * @throws IOException on content stream errors
      */
     public static void render(PDDocument document, PDPageContentStream cs, PageRef pageRef, VirtualLayout layout,
                               float fromY, float toY, float originX, float topY,

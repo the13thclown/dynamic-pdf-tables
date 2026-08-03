@@ -16,5 +16,11 @@ import java.io.IOException;
 @FunctionalInterface
 public interface DeferredDraw {
 
+    /**
+     * Runs the postponed drawing operation.
+     *
+     * @param ctx the original page, box and style with a fresh content stream
+     * @throws IOException on content stream errors
+     */
     void draw(RenderContext ctx) throws IOException;
 }

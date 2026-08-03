@@ -24,9 +24,15 @@ public final class Cell {
      * are offsets from the box's top-left corner, or both null for normal flow
      * (contents stack vertically). Flowing contents anchor to the top of the box
      * unless {@code bottom} is set, in which case they stack against its bottom.
+     *
+     * @param content the content
+     * @param x       horizontal offset from the content box's left edge, or null for flow
+     * @param y       vertical offset from the content box's top edge, or null for flow
+     * @param bottom  whether a flowing content anchors to the bottom of the box
      */
     public record ContentEntry(CellContent content, Float x, Float y, boolean bottom) {
 
+        /** {@return whether this entry was placed with {@link Builder#addAt}} */
         public boolean positioned() {
             return x != null;
         }
@@ -53,37 +59,47 @@ public final class Cell {
         }
     }
 
+    /** {@return a new cell builder} */
     public static Builder builder() {
         return new Builder();
     }
 
-    /** Shorthand for a cell with a single content and no other settings. */
+    /**
+     * Shorthand for a cell with a single content and no other settings.
+     *
+     * @param content the cell's only content
+     * @return the cell
+     */
     public static Cell of(CellContent content) {
         return builder().add(content).build();
     }
 
+    /** {@return the cell's contents with their placements, in the order added} */
     public List<ContentEntry> contents() {
         return contents;
     }
 
+    /** {@return the number of columns this cell spans, at least 1} */
     public int colSpan() {
         return colSpan;
     }
 
+    /** {@return the number of derived rows this cell spans, at least 1} */
     public int rowSpan() {
         return rowSpan;
     }
 
-    /** The cell's own style, possibly null (inherit everything). */
+    /** {@return the cell's own style, possibly null (inherit everything)} */
     public Style style() {
         return style;
     }
 
-    /** Content repeated at the bottom of every page slice of this cell, or null. */
+    /** {@return content repeated at the bottom of every page slice of this cell, or null} */
     public CellContent pageSliceContent() {
         return pageSliceContent;
     }
 
+    /** Builds a {@link Cell}. Obtained from {@link Cell#builder()}. */
     public static final class Builder {
         private final List<ContentEntry> contents = new ArrayList<>();
         private int colSpan = 1;
@@ -92,7 +108,15 @@ public final class Cell {
         private Style.Builder styleShortcuts;
         private CellContent pageSliceContent;
 
-        /** Adds a flowing content; flowing contents stack vertically inside the cell. */
+        private Builder() {
+        }
+
+        /**
+         * Adds a flowing content; flowing contents stack vertically inside the cell.
+         *
+         * @param content the content to add
+         * @return this builder
+         */
         public Builder add(CellContent content) {
             contents.add(new ContentEntry(Objects.requireNonNull(content, "content"), null, null, false));
             return this;
@@ -107,6 +131,9 @@ public final class Cell {
          * <p>
          * In a cell tall enough to be cut across pages, bottom-anchored content
          * therefore lands on the cell's <em>last</em> page.
+         *
+         * @param content the content to anchor to the bottom
+         * @return this builder
          */
         public Builder addBottom(CellContent content) {
             contents.add(new ContentEntry(Objects.requireNonNull(content, "content"), null, null, true));
@@ -121,6 +148,11 @@ public final class Cell {
          * reach. Elements crossing a page break pass down whole, and the whole
          * remaining arrangement continues on the next page shifted up as one
          * rigid piece — relative positions are always preserved.
+         *
+         * @param x       offset from the content box's left edge, in points
+         * @param y       offset from the content box's top edge, in points
+         * @param content the content to place
+         * @return this builder
          */
         public Builder addAt(float x, float y, CellContent content) {
             if (x < 0 || y < 0) {
@@ -130,6 +162,12 @@ public final class Cell {
             return this;
         }
 
+        /**
+         * Makes this cell span several columns.
+         *
+         * @param colSpan the number of columns this cell spans, at least 1
+         * @return this builder
+         */
         public Builder colSpan(int colSpan) {
             if (colSpan < 1) {
                 throw new IllegalArgumentException("colSpan must be >= 1");
@@ -138,6 +176,12 @@ public final class Cell {
             return this;
         }
 
+        /**
+         * Makes this cell span several derived rows.
+         *
+         * @param rowSpan the number of derived rows this cell spans, at least 1
+         * @return this builder
+         */
         public Builder rowSpan(int rowSpan) {
             if (rowSpan < 1) {
                 throw new IllegalArgumentException("rowSpan must be >= 1");
@@ -146,37 +190,78 @@ public final class Cell {
             return this;
         }
 
-        /** Base style for this cell; individual shortcut calls below win over it. */
+        /**
+         * Base style for this cell; individual shortcut calls below win over it.
+         *
+         * @param style the cell style
+         * @return this builder
+         */
         public Builder style(Style style) {
             this.style = style;
             return this;
         }
 
+        /**
+         * Shortcut for equal padding on all four sides.
+         *
+         * @param padding the padding in points
+         * @return this builder
+         */
         public Builder paddingAll(float padding) {
             shortcuts().padding(Padding.of(padding));
             return this;
         }
 
+        /**
+         * Shortcut for the cell's inner padding.
+         *
+         * @param padding the padding
+         * @return this builder
+         */
         public Builder padding(Padding padding) {
             shortcuts().padding(padding);
             return this;
         }
 
+        /**
+         * Shortcut for the cell's background fill.
+         *
+         * @param color the fill color
+         * @return this builder
+         */
         public Builder backgroundColor(Color color) {
             shortcuts().backgroundColor(color);
             return this;
         }
 
+        /**
+         * Shortcut for the same border on all four sides.
+         *
+         * @param border the border style
+         * @return this builder
+         */
         public Builder borderAll(BorderStyle border) {
             shortcuts().borderAll(border);
             return this;
         }
 
+        /**
+         * Shortcut for the horizontal alignment of the cell's contents.
+         *
+         * @param alignment the alignment
+         * @return this builder
+         */
         public Builder horizontalAlignment(HorizontalAlignment alignment) {
             shortcuts().horizontalAlignment(alignment);
             return this;
         }
 
+        /**
+         * Shortcut for the vertical alignment of the cell's contents.
+         *
+         * @param alignment the alignment
+         * @return this builder
+         */
         public Builder verticalAlignment(VerticalAlignment alignment) {
             shortcuts().verticalAlignment(alignment);
             return this;
@@ -199,12 +284,16 @@ public final class Cell {
          * after heights are fixed, so this content is an overlay: it is drawn
          * inside the bottom of each slice without reserving room. Leave bottom
          * padding for it, or accept that it sits over the tail of the flow.
+         *
+         * @param content the content to repeat on every page slice
+         * @return this builder
          */
         public Builder onEachPageSlice(CellContent content) {
             this.pageSliceContent = Objects.requireNonNull(content, "content");
             return this;
         }
 
+        /** {@return the finished cell} */
         public Cell build() {
             return new Cell(this);
         }

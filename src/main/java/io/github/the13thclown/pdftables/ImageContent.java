@@ -57,14 +57,30 @@ public final class ImageContent implements CellContent {
         this.height = b.height;
     }
 
+    /**
+     * {@return an image read from a file, at its natural size}
+     *
+     * @param path the image file (any format the platform's ImageIO reads)
+     */
     public static ImageContent of(Path path) {
         return builder(path).build();
     }
 
+    /**
+     * {@return an image from encoded bytes, at its natural size}
+     *
+     * @param bytes the encoded image data
+     * @param name  a name for the image, used in error messages and the PDF
+     */
     public static ImageContent of(byte[] bytes, String name) {
         return builder(bytes, name).build();
     }
 
+    /**
+     * {@return an in-memory image, at its natural size}
+     *
+     * @param image the image, embedded losslessly at draw time
+     */
     public static ImageContent of(BufferedImage image) {
         return builder(image).build();
     }
@@ -77,11 +93,19 @@ public final class ImageContent implements CellContent {
      * error (detected on the second document); the origin document itself
      * cannot be verified, so passing an XObject from the wrong document is
      * still the caller's responsibility.
+     *
+     * @param embedded the image XObject, already embedded in the target document
+     * @return the content
      */
     public static ImageContent of(PDImageXObject embedded) {
         return builder(embedded).build();
     }
 
+    /**
+     * {@return a builder for an image read from a file}
+     *
+     * @param path the image file (any format the platform's ImageIO reads)
+     */
     public static Builder builder(Path path) {
         try {
             return builder(Files.readAllBytes(path), path.getFileName().toString());
@@ -90,14 +114,30 @@ public final class ImageContent implements CellContent {
         }
     }
 
+    /**
+     * {@return a builder for an image from encoded bytes}
+     *
+     * @param bytes the encoded image data
+     * @param name  a name for the image, used in error messages and the PDF
+     */
     public static Builder builder(byte[] bytes, String name) {
         return new Builder(bytes.clone(), name, null, null);
     }
 
+    /**
+     * {@return a builder for an in-memory image}
+     *
+     * @param image the image, embedded losslessly at draw time
+     */
     public static Builder builder(BufferedImage image) {
         return new Builder(null, "image", image, null);
     }
 
+    /**
+     * {@return a builder for an already embedded image — see {@link #of(PDImageXObject)} for the constraints}
+     *
+     * @param embedded the image XObject, already embedded in the target document
+     */
     public static Builder builder(PDImageXObject embedded) {
         return new Builder(null, "image", null, Objects.requireNonNull(embedded, "embedded"));
     }
@@ -204,6 +244,7 @@ public final class ImageContent implements CellContent {
         }
     }
 
+    /** Builds an {@link ImageContent}. Obtained from one of the {@code builder} factories. */
     public static final class Builder {
         private final byte[] bytes;
         private final String name;
@@ -235,7 +276,12 @@ public final class ImageContent implements CellContent {
             }
         }
 
-        /** Rendered width in points; height follows the aspect ratio unless also set. */
+        /**
+         * Rendered width in points; height follows the aspect ratio unless also set.
+         *
+         * @param width the width in points
+         * @return this builder
+         */
         public Builder width(float width) {
             if (width <= 0) {
                 throw new IllegalArgumentException("width must be > 0");
@@ -244,7 +290,12 @@ public final class ImageContent implements CellContent {
             return this;
         }
 
-        /** Rendered height in points; width follows the aspect ratio unless also set. */
+        /**
+         * Rendered height in points; width follows the aspect ratio unless also set.
+         *
+         * @param height the height in points
+         * @return this builder
+         */
         public Builder height(float height) {
             if (height <= 0) {
                 throw new IllegalArgumentException("height must be > 0");
@@ -253,6 +304,7 @@ public final class ImageContent implements CellContent {
             return this;
         }
 
+        /** {@return the finished content} */
         public ImageContent build() {
             return new ImageContent(this);
         }

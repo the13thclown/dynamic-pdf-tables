@@ -28,12 +28,21 @@ public final class PlaceholderContent implements CellContent {
         this.height = height;
     }
 
-    /** A placeholder of a declared width and height. */
+    /**
+     * {@return a placeholder of a declared width and height}
+     *
+     * @param width  the width in points, capped to the cell's content width
+     * @param height the height in points
+     */
     public static PlaceholderContent ofSize(float width, float height) {
         return new PlaceholderContent(width, height);
     }
 
-    /** A placeholder spanning the full available width of the cell. */
+    /**
+     * {@return a placeholder spanning the full available width of the cell}
+     *
+     * @param height the height in points
+     */
     public static PlaceholderContent ofHeight(float height) {
         return new PlaceholderContent(null, height);
     }

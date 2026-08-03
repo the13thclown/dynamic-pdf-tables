@@ -19,11 +19,12 @@ public final class PageRef {
         this.deferrals = deferrals;
     }
 
+    /** {@return the page itself} */
     public PDPage page() {
         return page;
     }
 
-    /** Zero-based position of this page in the document at the time it was drawn. */
+    /** {@return the zero-based position of this page in the document at the time it was drawn} */
     public int pageIndex() {
         return pageIndex;
     }

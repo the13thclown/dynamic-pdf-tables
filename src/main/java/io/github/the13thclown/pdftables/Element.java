@@ -13,7 +13,7 @@ import java.io.IOException;
  */
 public interface Element {
 
-    /** Height of this element in points, fixed once the content has been laid out. */
+    /** {@return the height of this element in points, fixed once the content has been laid out} */
     float getHeight();
 
     /**
@@ -22,6 +22,9 @@ public interface Element {
      * and is exactly {@link #getHeight()} tall — elements know nothing about
      * cells or pages. Horizontal alignment within the box is the element's job,
      * using the resolved style in {@code ctx}.
+     *
+     * @param ctx the box, style and PDF objects to draw with
+     * @throws IOException on content stream errors
      */
     void draw(RenderContext ctx) throws IOException;
 
@@ -37,12 +40,20 @@ public interface Element {
      * Contract for a non-null result: {@code top.getHeight() <= availableHeight}
      * and both pieces taller than zero — otherwise the engine ignores the split
      * and treats the element as atomic for this cut.
+     *
+     * @param availableHeight the space in points between this element's top and the cut
+     * @return the two pieces, or {@code null} to stay atomic
      */
     default Split splitAt(float availableHeight) {
         return null;
     }
 
-    /** The two pieces of a split element: {@code top} stays on the current page. */
+    /**
+     * The two pieces of a split element.
+     *
+     * @param top    the piece that stays on the current page
+     * @param bottom the piece that continues on the next page
+     */
     record Split(Element top, Element bottom) {
     }
 }
