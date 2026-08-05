@@ -303,25 +303,61 @@ public final class RichTextContent implements CellContent {
         for (int i = 0; i < lines.size(); i++) {
             List<Run> l = lines.get(i);
             elements.add(new RichLineElement(List.copyOf(l), totalWidth(l),
-                    lineHeightOf(l, baseSize, spacing), justifiables.get(i)));
+                    lineHeightOf(l, baseSize, spacing), justifiables.get(i),
+                    metricsOf(l, baseSize)));
         }
         return elements;
     }
 
     private static final Object NEWLINE = new Object();
 
-    private static float lineHeightOf(List<Run> line, float baseSize, float spacing) {
-        float maxSize = baseSize;
-        float maxImage = 0;
+    /**
+     * The vertical band a line occupies relative to its baseline, and the height
+     * at which inline images are centred — half the text's x-height, so a picture
+     * sits with the words rather than towering over them from the baseline.
+     */
+    private record LineMetrics(float ascent, float descent, float middle) {
+    }
+
+    private static LineMetrics metricsOf(List<Run> line, float baseSize) {
+        float maxAscent = 0;
+        float minDescent = 0;
+        float xHeight = 0;
         for (Run r : line) {
             if (r.isImage()) {
-                maxImage = Math.max(maxImage, r.image().height());
-            } else {
+                continue;
+            }
+            var descriptor = r.font().getFontDescriptor();
+            maxAscent = Math.max(maxAscent, descriptor.getAscent() / 1000f * r.size());
+            minDescent = Math.min(minDescent, descriptor.getDescent() / 1000f * r.size());
+            float x = descriptor.getXHeight() / 1000f * r.size();
+            xHeight = Math.max(xHeight, x > 0 ? x : r.size() * 0.5f);
+        }
+        if (xHeight <= 0) {
+            xHeight = baseSize * 0.5f;
+        }
+        float middle = xHeight / 2f;
+        for (Run r : line) {
+            if (!r.isImage()) {
+                continue;
+            }
+            float half = r.image().height() / 2f;
+            maxAscent = Math.max(maxAscent, middle + half);
+            minDescent = Math.min(minDescent, middle - half);
+        }
+        return new LineMetrics(maxAscent, minDescent, middle);
+    }
+
+    private static float lineHeightOf(List<Run> line, float baseSize, float spacing) {
+        float maxSize = baseSize;
+        for (Run r : line) {
+            if (!r.isImage()) {
                 maxSize = Math.max(maxSize, r.size());
             }
         }
+        LineMetrics metrics = metricsOf(line, baseSize);
         // an image taller than the text pushes the line open rather than overflowing it
-        return Math.max(maxSize * spacing, maxImage);
+        return Math.max(maxSize * spacing, metrics.ascent() - metrics.descent());
     }
 
     private static float totalWidth(List<Run> runs) {
@@ -361,7 +397,8 @@ public final class RichTextContent implements CellContent {
         return new Run(safeText, font, size, color, TextContent.widthOf(safeText, font, size), null);
     }
 
-    private record RichLineElement(List<Run> runs, float lineWidth, float lineHeight, boolean justifiable)
+    private record RichLineElement(List<Run> runs, float lineWidth, float lineHeight, boolean justifiable,
+                                   LineMetrics metrics)
             implements Element {
 
         @Override
@@ -392,25 +429,17 @@ public final class RichTextContent implements CellContent {
                     extraPerSpace = (ctx.width() - lineWidth) / spaceRuns;
                 }
             }
-            // one shared baseline: center the tallest ascent-descent band in the box.
-            // An inline image counts as ascent, so it sits on the baseline like a glyph.
-            float maxAscent = 0;
-            float minDescent = 0;
-            for (Run r : runs) {
-                if (r.isImage()) {
-                    maxAscent = Math.max(maxAscent, r.image().height());
-                    continue;
-                }
-                maxAscent = Math.max(maxAscent, r.font().getFontDescriptor().getAscent() / 1000f * r.size());
-                minDescent = Math.min(minDescent, r.font().getFontDescriptor().getDescent() / 1000f * r.size());
-            }
-            float baseline = ctx.y() + (lineHeight - (maxAscent - minDescent)) / 2 - minDescent;
+            // one shared baseline: center the tallest ascent-descent band in the box
+            float baseline = ctx.y() + (lineHeight - (metrics.ascent() - metrics.descent())) / 2
+                    - metrics.descent();
 
             float cursor = x;
             for (Run r : runs) {
                 if (r.isImage()) {
-                    ctx.stream().drawImage(r.image().image(), cursor, baseline,
-                            r.image().width(), r.image().height());
+                    // centred on the text's mid-height, as inline pictures are set
+                    float height = r.image().height();
+                    ctx.stream().drawImage(r.image().image(), cursor,
+                            baseline + metrics.middle() - height / 2f, r.image().width(), height);
                     cursor += r.width();
                     continue;
                 }

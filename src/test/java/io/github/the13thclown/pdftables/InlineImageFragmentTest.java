@@ -84,6 +84,64 @@ class InlineImageFragmentTest {
     }
 
     @Test
+    void anImageIsCentredOnTheTextNotStoodOnTheBaseline() throws IOException {
+        // Standing a picture on the baseline makes a tall one tower over the words: its centre
+        // ends up an icon-height above the text's. Centred on the text's mid-height the two
+        // centres nearly coincide, which is what makes an icon read as part of the sentence.
+        try (PDDocument doc = new PDDocument()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            Table table = Table.builder()
+                    .addColumnsOfWidth(220)
+                    .defaultStyle(Style.builder().padding(Padding.of(4)).fontSize(9).build())
+                    .add(Cell.of(RichTextContent.builder()
+                            .add(RichTextContent.Fragment.image(icon(doc, 16, 16), 28))
+                            .add(" NOTE the actuators are vented units filled with grease")
+                            .build()))
+                    .build();
+            TableDrawer.builder().document(doc).page(page).table(table)
+                    .startX(50).startY(700).build().draw();
+
+            var rendered = new org.apache.pdfbox.rendering.PDFRenderer(doc).renderImage(0, 1);
+
+            int firstIconRow = Integer.MAX_VALUE;
+            int lastIconRow = Integer.MIN_VALUE;
+            long iconSum = 0;
+            long iconCount = 0;
+            for (int y = 0; y < rendered.getHeight(); y++) {
+                for (int x = 50; x < 82; x++) {
+                    Color pixel = new Color(rendered.getRGB(x, y));
+                    if (pixel.getRed() > 180 && pixel.getBlue() < 80 && pixel.getGreen() < 80) {
+                        firstIconRow = Math.min(firstIconRow, y);
+                        lastIconRow = Math.max(lastIconRow, y);
+                        iconSum += y;
+                        iconCount++;
+                    }
+                }
+            }
+            assertThat(iconCount).as("the icon must be visible").isPositive();
+
+            // text of the same line only: rows the icon spans, to the right of it
+            long textSum = 0;
+            long textCount = 0;
+            for (int y = firstIconRow; y <= lastIconRow; y++) {
+                for (int x = 86; x < 260; x++) {
+                    if (new Color(rendered.getRGB(x, y)).getRed() < 100) {
+                        textSum += y;
+                        textCount++;
+                    }
+                }
+            }
+            assertThat(textCount).as("the sentence must share the icon's line").isPositive();
+
+            float iconCentre = (float) iconSum / iconCount;
+            float textCentre = (float) textSum / textCount;
+            assertThat(Math.abs(iconCentre - textCentre))
+                    .as("icon centre %s vs text centre %s", iconCentre, textCentre)
+                    .isLessThan(3f);
+        }
+    }
+
+    @Test
     void zeroOrNegativeDimensionsAreRejected() throws IOException {
         try (PDDocument doc = new PDDocument()) {
             PDImageXObject image = icon(doc, 16, 16);
