@@ -4,6 +4,7 @@ import io.github.the13thclown.pdftables.render.RenderContext;
 import io.github.the13thclown.pdftables.style.HorizontalAlignment;
 import io.github.the13thclown.pdftables.style.Style;
 import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 
 import java.awt.Color;
 import java.io.IOException;
@@ -39,12 +40,54 @@ public final class RichTextContent implements CellContent {
         private final PDFont font;
         private final Float fontSize;
         private final Color color;
+        private final InlineImage image;
 
         private Fragment(String text, PDFont font, Float fontSize, Color color) {
             this.text = Objects.requireNonNull(text, "text");
             this.font = font;
             this.fontSize = fontSize;
             this.color = color;
+            this.image = null;
+        }
+
+        private Fragment(InlineImage image) {
+            this.text = "";
+            this.font = null;
+            this.fontSize = null;
+            this.color = null;
+            this.image = image;
+        }
+
+        /**
+         * {@return a fragment that is a picture sitting on the text baseline}
+         *
+         * An inline image takes part in wrapping as a single unbreakable word, so an
+         * icon placed before a sentence stays attached to it while the text flows on
+         * beside it and wraps back to the full width underneath — unlike a picture in
+         * its own cell, which puts every following line beside it. A line containing
+         * one grows to fit it.
+         *
+         * @param image  an image already embedded in the document being drawn
+         * @param height the rendered height in points; the width follows the aspect ratio
+         */
+        public static Fragment image(PDImageXObject image, float height) {
+            Objects.requireNonNull(image, "image");
+            float aspect = (float) image.getWidth() / image.getHeight();
+            return image(image, height * aspect, height);
+        }
+
+        /**
+         * {@return a fragment that is a picture sitting on the text baseline}
+         *
+         * @param image  an image already embedded in the document being drawn
+         * @param width  the rendered width in points
+         * @param height the rendered height in points
+         */
+        public static Fragment image(PDImageXObject image, float width, float height) {
+            if (width <= 0 || height <= 0) {
+                throw new IllegalArgumentException("Inline image width and height must be > 0");
+            }
+            return new Fragment(new InlineImage(Objects.requireNonNull(image, "image"), width, height));
         }
 
         /**
@@ -113,11 +156,20 @@ public final class RichTextContent implements CellContent {
         return new Builder();
     }
 
-    /** A run: a maximal same-styled piece of text with a fixed width. */
-    private record Run(String text, PDFont font, float size, Color color, float width) {
+    /** A picture placed in the text flow, sized in points. */
+    private record InlineImage(PDImageXObject image, float width, float height) {
+    }
+
+    /** A run: a maximal same-styled piece of text with a fixed width, or one inline image. */
+    private record Run(String text, PDFont font, float size, Color color, float width,
+                       InlineImage image) {
 
         boolean isSpace() {
-            return " ".equals(text);
+            return image == null && " ".equals(text);
+        }
+
+        boolean isImage() {
+            return image != null;
         }
     }
 
@@ -133,6 +185,15 @@ public final class RichTextContent implements CellContent {
         List<Object> tokens = new ArrayList<>();     // List<Run>-words and NEWLINE markers
         List<Run> word = new ArrayList<>();
         for (Fragment f : fragments) {
+            if (f.image != null) {
+                // an image is one unbreakable word; it never merges with adjacent text
+                if (!word.isEmpty()) {
+                    tokens.add(word);
+                    word = new ArrayList<>();
+                }
+                tokens.add(new ArrayList<>(List.of(imageRun(f.image))));
+                continue;
+            }
             PDFont font = f.font != null ? f.font : base;
             float size = f.fontSize != null ? f.fontSize : baseSize;
             Color fragColor = f.color != null ? f.color : color;
@@ -182,11 +243,11 @@ public final class RichTextContent implements CellContent {
             @SuppressWarnings("unchecked")
             List<Run> w = (List<Run>) token;
             float wordWidth = totalWidth(w);
-            Run spaceStyle = lineHasContent ? line.get(line.size() - 1) : w.get(0);
-            float spaceWidth = lineHasContent ? run(" ", spaceStyle.font(), spaceStyle.size(), spaceStyle.color()).width() : 0;
+            Run spaceRun = spaceRun(line, w, base, baseSize, color);
+            float spaceWidth = lineHasContent ? spaceRun.width() : 0;
             if (lineWidth + spaceWidth + wordWidth <= availableWidth + EPS) {
                 if (lineHasContent) {
-                    line.add(run(" ", spaceStyle.font(), spaceStyle.size(), spaceStyle.color()));
+                    line.add(spaceRun);
                     lineWidth += spaceWidth;
                 }
                 line.addAll(w);
@@ -251,10 +312,16 @@ public final class RichTextContent implements CellContent {
 
     private static float lineHeightOf(List<Run> line, float baseSize, float spacing) {
         float maxSize = baseSize;
+        float maxImage = 0;
         for (Run r : line) {
-            maxSize = Math.max(maxSize, r.size());
+            if (r.isImage()) {
+                maxImage = Math.max(maxImage, r.image().height());
+            } else {
+                maxSize = Math.max(maxSize, r.size());
+            }
         }
-        return maxSize * spacing;
+        // an image taller than the text pushes the line open rather than overflowing it
+        return Math.max(maxSize * spacing, maxImage);
     }
 
     private static float totalWidth(List<Run> runs) {
@@ -265,9 +332,33 @@ public final class RichTextContent implements CellContent {
         return sum;
     }
 
+    private static Run imageRun(InlineImage image) {
+        return new Run("", null, 0, null, image.width(), image);
+    }
+
+    /**
+     * The space separating a word from what precedes it, styled like the nearest
+     * text around it. Images carry no font, so they are skipped: a space next to
+     * an inline icon takes the style of the words, not of the picture.
+     */
+    private static Run spaceRun(List<Run> line, List<Run> word, PDFont base, float baseSize, Color color) {
+        for (int i = line.size() - 1; i >= 0; i--) {
+            if (!line.get(i).isImage()) {
+                Run r = line.get(i);
+                return run(" ", r.font(), r.size(), r.color());
+            }
+        }
+        for (Run r : word) {
+            if (!r.isImage()) {
+                return run(" ", r.font(), r.size(), r.color());
+            }
+        }
+        return run(" ", base, baseSize, color);
+    }
+
     private static Run run(String text, PDFont font, float size, Color color) {
         String safeText = TextContent.safe(text, font);
-        return new Run(safeText, font, size, color, TextContent.widthOf(safeText, font, size));
+        return new Run(safeText, font, size, color, TextContent.widthOf(safeText, font, size), null);
     }
 
     private record RichLineElement(List<Run> runs, float lineWidth, float lineHeight, boolean justifiable)
@@ -301,10 +392,15 @@ public final class RichTextContent implements CellContent {
                     extraPerSpace = (ctx.width() - lineWidth) / spaceRuns;
                 }
             }
-            // one shared baseline: center the tallest ascent-descent band in the box
+            // one shared baseline: center the tallest ascent-descent band in the box.
+            // An inline image counts as ascent, so it sits on the baseline like a glyph.
             float maxAscent = 0;
             float minDescent = 0;
             for (Run r : runs) {
+                if (r.isImage()) {
+                    maxAscent = Math.max(maxAscent, r.image().height());
+                    continue;
+                }
                 maxAscent = Math.max(maxAscent, r.font().getFontDescriptor().getAscent() / 1000f * r.size());
                 minDescent = Math.min(minDescent, r.font().getFontDescriptor().getDescent() / 1000f * r.size());
             }
@@ -312,6 +408,12 @@ public final class RichTextContent implements CellContent {
 
             float cursor = x;
             for (Run r : runs) {
+                if (r.isImage()) {
+                    ctx.stream().drawImage(r.image().image(), cursor, baseline,
+                            r.image().width(), r.image().height());
+                    cursor += r.width();
+                    continue;
+                }
                 ctx.stream().setNonStrokingColor(r.color());
                 ctx.stream().beginText();
                 ctx.stream().setFont(r.font(), r.size());
