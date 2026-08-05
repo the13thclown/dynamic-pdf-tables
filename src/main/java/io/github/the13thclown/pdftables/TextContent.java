@@ -224,7 +224,7 @@ public final class TextContent implements CellContent {
             boolean justify = alignment == HorizontalAlignment.JUSTIFY && justifiable && spaces > 0;
             float drawnWidth = justify ? ctx.width() : lineWidth;
 
-            drawBoxes(ctx, x, baseline, drawnWidth, ascent, descent);
+            drawBoxes(ctx, x, drawnWidth, ascent, descent);
 
             ctx.stream().setNonStrokingColor(color);
             ctx.stream().beginText();
@@ -242,15 +242,19 @@ public final class TextContent implements CellContent {
         }
 
         /** Highlight fill and frame stroke, hugging the glyph band of this line. */
-        private void drawBoxes(RenderContext ctx, float x, float baseline, float width,
+        private void drawBoxes(RenderContext ctx, float x, float width,
                                float ascent, float descent) throws IOException {
             if (!decorations.anyBox()) {
                 return;
             }
             float boxX = x - BOX_PADDING;
-            float boxY = baseline + descent - BOX_PADDING;
             float boxWidth = width + 2 * BOX_PADDING;
-            float boxHeight = (ascent - descent) + 2 * BOX_PADDING;
+            // A font's ascent-to-descent band is commonly taller than the line box, so the
+            // padded box must be clamped to the line: unclamped, the highlights of consecutive
+            // lines grow into one another. Concentric with the glyph band, which the baseline
+            // is centred on too.
+            float boxHeight = Math.min((ascent - descent) + 2 * BOX_PADDING, ctx.height());
+            float boxY = ctx.y() + (ctx.height() - boxHeight) / 2f;
 
             if (decorations.highlight() != null) {
                 ctx.stream().saveGraphicsState();
@@ -261,11 +265,17 @@ public final class TextContent implements CellContent {
                 ctx.stream().restoreGraphicsState();
             }
             if (decorations.frameColor() != null) {
+                // a stroke straddles its path, so inset by half the pen width to keep the
+                // whole frame inside the line box
+                float inset = decorations.frameWidth() / 2f;
+                float frameWidth = Math.max(boxWidth - 2 * inset, 0.1f);
+                float frameHeight = Math.max(boxHeight - 2 * inset, 0.1f);
                 ctx.stream().saveGraphicsState();
                 applyAlpha(ctx, decorations.frameColor(), true);
                 ctx.stream().setStrokingColor(opaque(decorations.frameColor()));
                 ctx.stream().setLineWidth(decorations.frameWidth());
-                roundedRect(ctx, boxX, boxY, boxWidth, boxHeight, decorations.frameRadius());
+                roundedRect(ctx, boxX + inset, boxY + inset, frameWidth, frameHeight,
+                        decorations.frameRadius());
                 ctx.stream().stroke();
                 ctx.stream().restoreGraphicsState();
             }
