@@ -10,7 +10,7 @@ Releases are published to Maven Central:
 <dependency>
     <groupId>io.github.the13thclown</groupId>
     <artifactId>dynamic-pdf-tables</artifactId>
-    <version>0.2.0</version>
+    <version>0.3.0</version>
 </dependency>
 ```
 
@@ -120,7 +120,7 @@ untiled example, and `spans.pdf` for a tiled one).
 - Text: `TextContent.builder("...").font(F).fontSize(10).color(c).lineSpacing(1.3f)` — wraps at the content width (spaces, `\n`, mid-word for overlong words), aligns per cell style, splits across pages line by line; unencodable characters become `?`
 - Per-line text decorations: `.strikethrough(true)`, `.underline(true)`, `.highlight(color, radius)` (filled box behind the glyphs, alpha honoured), `.frame(color, width, radius)` (outline around the glyphs) — sized to the text, not the cell
 - Rich text: `RichTextContent.builder().add("plain ").add(RichTextContent.fragment("bold red").font(bold).color(red))` — mixed font/size/color fragments wrap together as one paragraph (words never break at fragment boundaries) and share a common baseline per line
-- Inline images: `RichTextContent.Fragment.image(icon, 10)` places a picture in the text flow, sitting on the baseline and wrapping as one unbreakable word � an icon before a sentence stays attached to it while the text carries on beside it and wraps back to the full width underneath, which a picture in its own cell cannot do
+- Inline images: `RichTextContent.Fragment.image(icon, 10)` places a picture in the text flow, sitting on the baseline and wrapping as one unbreakable word — an icon before a sentence stays attached to it while the text carries on beside it and wraps back to the full width underneath, which a picture in its own cell cannot do
 - Images: `ImageContent.builder(pathOrBytesOrBufferedImage).width(70)` — natural size fits down to the content width, explicit width/height scale proportionally (both = stretch); the document-bound XObject is created lazily and cached per document, so a repeated header logo embeds once
 - Form XObjects: `FormContent.builder(form).width(20)` — vector snippets (stamps, icons, pages imported via `LayerUtility`) placed at the cell position and scaled from their bounding box; never shrunk to fit, since a silently scaled stamp is a falsified one
 - Nested tables: `TableContent.of(innerTable)` — inner rows become atomic elements, so nested tables split across pages at inner row boundaries (any depth)
